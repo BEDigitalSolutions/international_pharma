@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Biopharma Intl - Data Entry Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root {
+      --corp-blue: #1e40af;
+      --corp-gray: #64748b;
+      --bg-light: #f1f5f9;
+    }
+    .resizer {
+      cursor: col-resize;
+      width: 4px;
+      background: #cbd5e1;
+      transition: background 0.2s;
+    }
+    .resizer:hover {
+      background: #94a3b8;
+    }
+    .resizer.active {
+      background: var(--corp-blue);
+    }
+    .cell-editable {
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .cell-editable:hover {
+      background: #e0e7ff;
+    }
+    .cell-readonly {
+      background: #f1f5f9;
+      color: #64748b;
+      cursor: not-allowed;
+    }
+    .cell-input {
+      width: 100%;
+      border: 2px solid var(--corp-blue);
+      padding: 2px 4px;
+      font-size: inherit;
+    }
+  </style>
+</head>
+<body class="h-screen bg-slate-50 text-slate-900 overflow-hidden">
+  <div class="h-full flex" id="mainContainer">
+
+    <!-- LEFT PANEL: Menu (1/6 default) -->
+    <aside id="leftPanel" class="bg-slate-900 text-slate-100 flex flex-col" style="min-width: 200px; width: 16.67%;">
+      <div class="px-4 py-4 border-b border-slate-700">
+        <h1 class="text-lg font-semibold text-white">Biopharma Intl</h1>
+        <p class="text-xs text-slate-400 mt-1">Data Entry System</p>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto mt-2" id="menuNav">
+        <!-- Menu items will be generated from Solutions_v2.md structure -->
+      </nav>
+
+      <div class="px-4 py-3 border-t border-slate-700 text-xs text-slate-400">
+        <p>Click to navigate</p>
+        <p class="mt-1">Drag borders to resize</p>
+      </div>
+    </aside>
+
+    <!-- LEFT RESIZER -->
+    <div class="resizer" id="leftResizer"></div>
+
+    <!-- CENTER PANEL: Selection (2/6 default, hidden for Sales Data) -->
+    <main id="centerPanel" class="border-x border-slate-200 flex flex-col bg-white" style="width: 33.33%;">
+      <header class="px-4 py-3 bg-slate-50 border-b border-slate-200">
+        <h2 class="text-sm font-semibold text-slate-800" id="centerPanelTitle">Selection</h2>
+        <p class="text-xs text-slate-500" id="centerPanelSubtitle">Select an item to edit</p>
+      </header>
+      <div id="centerPanelContent" class="flex-1 overflow-y-auto p-3">
+        <!-- Content will be generated based on selected module -->
+      </div>
+    </main>
+
+    <!-- RIGHT RESIZER -->
+    <div class="resizer" id="rightResizer"></div>
+
+    <!-- RIGHT PANEL: Editing (3/6 default) -->
+    <section id="rightPanel" class="flex-1 flex flex-col bg-white" style="min-width: 400px;">
+      <header class="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-800" id="rightPanelTitle">Details / Editing</h2>
+          <p class="text-xs text-slate-500" id="rightPanelSubtitle">Select an item from the center panel</p>
+        </div>
+      </header>
+      <div id="rightPanelContent" class="flex-1 overflow-y-auto p-4">
+        <!-- Content will be generated based on selected module -->
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // ===== DATA =====
+    const countries = [
+      "Spain", "France", "Germany", "Italy", "United Kingdom", 
+      "United States", "Canada", "Brazil", "Mexico", "Argentina",
+      "Japan", "China", "India", "Australia", "South Africa"
+    ];
+
+    const products = [
+      "Albumin 20%", "Albumin 25%", "IVIG", "Factor VIII", 
+      "Factor IX", "Fibrinogen", "Prothrombin Complex", "Antithrombin III"
+    ];
+
+    const companies = [
+      "Grifols", "CSL Behring", "Octapharma", "Takeda", 
+      "Baxalta", "Kedrion", "LFB", "Bio Products Laboratory"
+    ];
+
+    const months = ["January", "February", "March", "April", "May", "June", 
+                    "July", "August", "September", "October", "November", "December"];
+
+    const users = [
+      { id: 1, name: "John Smith", email: "john.smith@grifols.com", group: "Data Entry Managers" },
+      { id: 2, name: "Maria Garcia", email: "maria.garcia@grifols.com", group: "Data Entry Managers" },
+      { id: 3, name: "Pierre Dubois", email: "pierre.dubois@grifols.com", group: "Country Users" },
+      { id: 4, name: "Anna Müller", email: "anna.muller@grifols.com", group: "Country Users" },
+      { id: 5, name: "David Johnson", email: "david.johnson@grifols.com", group: "Supervisors" }
+    ];
+
+    const groups = [
+      "Data Entry Managers", "Country Users", "Supervisors", "Read-Only Users"
+    ];
+
+    const currencies = ["€ (EUR)", "$ (USD)", "£ (GBP)", "¥ (JPY)", "Peso (MXN)", "Real (BRL)", "Yuan (CNY)"];
+
+    // ===== STATE =====
+    let currentModule = null;
+    let currentSubmodule = null;
+    let selectedItem = null;
+    let editingCell = null;
+
+    // ===== MENU STRUCTURE =====
+    const menuStructure = {
+      "DataEntry": {
+        label: "Data Entry",
+        icon: "📊",
+        submodules: {
+          "ProcessVisibility": { label: "Process Visibility", hasCenter: true, hasRight: true },
+          "PatientsNewsDropouts": { label: "Patients News/Dropouts", hasCenter: true, hasRight: true },
+          "SalesData": { label: "Sales Data", hasCenter: false, hasRight: true },
+          "MarketInsights": { label: "Market Insights", hasCenter: true, hasRight: true }
+        }
+      },
+      "MasterData": {
+        label: "Master Data",
+        icon: "🗂️",
+        submodules: {
+          "CountriesSetup": { label: "Countries Setup", hasCenter: true, hasRight: true },
+          "ProductsFamilies": { label: "Products/Families", hasCenter: true, hasRight: true },
+          "Pricing": { label: "Pricing", hasCenter: true, hasRight: true }
+        }
+      },
+      "Supervisor": {
+        label: "Supervisor",
+        icon: "⚙️",
+        submodules: {
+          "Users": { label: "Users", hasCenter: true, hasRight: true },
+          "Scenarios": { label: "Scenarios", hasCenter: true, hasRight: true }
+        }
+      }
+    };
+
+    // ===== RESIZER LOGIC =====
+    let isResizing = false;
+    let resizeType = null;
+    let startX = 0;
+    let startLeftWidth = 0;
+    let startCenterWidth = 0;
+    let startRightWidth = 0;
+
+    document.getElementById("leftResizer").addEventListener("mousedown", (e) => {
+      isResizing = true;
+      resizeType = "left";
+      startX = e.clientX;
+      startLeftWidth = parseFloat(getComputedStyle(document.getElementById("leftPanel")).width);
+      startCenterWidth = parseFloat(getComputedStyle(document.getElementById("centerPanel")).width);
+      document.body.style.cursor = "col-resize";
+      e.preventDefault();
+    });
+
+    document.getElementById("rightResizer").addEventListener("mousedown", (e) => {
+      isResizing = true;
+      resizeType = "right";
+      startX = e.clientX;
+      startCenterWidth = parseFloat(getComputedStyle(document.getElementById("centerPanel")).width);
+      startRightWidth = parseFloat(getComputedStyle(document.getElementById("rightPanel")).width);
+      document.body.style.cursor = "col-resize";
+      e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e) => {
+      if (!isResizing) return;
+      const deltaX = e.clientX - startX;
+      const containerWidth = document.getElementById("mainContainer").offsetWidth;
+
+      if (resizeType === "left") {
+        const newLeftWidth = Math.max(200, Math.min(startLeftWidth + deltaX, containerWidth - 600));
+        const newCenterWidth = startCenterWidth - (newLeftWidth - startLeftWidth);
+        if (newLeftWidth >= 200 && newCenterWidth >= 200) {
+          document.getElementById("leftPanel").style.width = `${newLeftWidth}px`;
+          document.getElementById("centerPanel").style.width = `${newCenterWidth}px`;
+        }
+      } else if (resizeType === "right") {
+        const newCenterWidth = Math.max(200, Math.min(startCenterWidth + deltaX, containerWidth - 600));
+        const newRightWidth = startRightWidth - (newCenterWidth - startCenterWidth);
+        if (newCenterWidth >= 200 && newRightWidth >= 400) {
+          document.getElementById("centerPanel").style.width = `${newCenterWidth}px`;
+          document.getElementById("rightPanel").style.width = `${newRightWidth}px`;
+        }
+      }
+    });
+
+    document.addEventListener("mouseup", () => {
+      if (isResizing) {
+        isResizing = false;
+        resizeType = null;
+        document.body.style.cursor = "";
+      }
+    });
+
+    // ===== MENU RENDERING =====
+    function renderMenu() {
+      const nav = document.getElementById("menuNav");
+      nav.innerHTML = "";
+
+      Object.entries(menuStructure).forEach(([moduleKey, module]) => {
+        const h1 = document.createElement("div");
+        h1.className = "px-4 py-2 text-xs uppercase tracking-wide text-slate-500 font-semibold";
+        h1.textContent = module.label;
+        nav.appendChild(h1);
+
+        Object.entries(module.submodules).forEach(([subKey, sub]) => {
+          const button = document.createElement("button");
+          button.className = `w-full text-left px-4 py-2 text-sm hover:bg-slate-800 flex items-center gap-2 ${
+            currentModule === moduleKey && currentSubmodule === subKey ? "bg-slate-800 border-l-2 border-blue-400" : ""
+          }`;
+          button.innerHTML = `<span>${sub.label}</span>`;
+          button.addEventListener("click", () => {
+            currentModule = moduleKey;
+            currentSubmodule = subKey;
+            selectedItem = null;
+            renderContent();
+            renderMenu();
+          });
+          nav.appendChild(button);
+        });
+      });
+    }
+
+    // ===== CONTENT RENDERING =====
+    function renderContent() {
+      if (!currentModule || !currentSubmodule) {
+        renderPlaceholder("Select a module from the menu");
+        return;
+      }
+
+      const module = menuStructure[currentModule].submodules[currentSubmodule];
+      const centerPanel = document.getElementById("centerPanel");
+      const centerContent = document.getElementById("centerPanelContent");
+
+      // Handle special layout for Sales Data
+      if (currentSubmodule === "SalesData") {
+        centerPanel.style.display = "none";
+        document.getElementById("leftResizer").style.display = "none";
+        document.getElementById("rightResizer").style.display = "none";
+      } else {
+        centerPanel.style.display = "flex";
+        document.getElementById("leftResizer").style.display = "block";
+        document.getElementById("rightResizer").style.display = "block";
+      }
+
+      // Render center panel
+      if (module.hasCenter) {
+        renderCenterPanel(module);
+      } else {
+        centerContent.innerHTML = "";
+      }
+
+      // Render right panel
+      if (module.hasRight) {
+        renderRightPanel(module);
+      } else {
+        document.getElementById("rightPanelContent").innerHTML = "";
+      }
+    }
+
+    function renderCenterPanel(module) {
+      const content = document.getElementById("centerPanelContent");
+      const title = document.getElementById("centerPanelTitle");
+      const subtitle = document.getElementById("centerPanelSubtitle");
+
+      if (currentSubmodule === "ProcessVisibility") {
+        title.textContent = "Process Visibility";
+        subtitle.textContent = "Not yet defined";
+        content.innerHTML = '<div class="text-center text-slate-500 py-8">Not yet defined - placeholder</div>';
+      } else if (currentSubmodule === "PatientsNewsDropouts") {
+        title.textContent = "Countries";
+        subtitle.textContent = "Select a country to edit patient data";
+        content.innerHTML = countries.map(country => `
+          <button class="w-full text-left px-3 py-2 mb-1 rounded border border-slate-200 hover:bg-blue-50 hover:border-blue-300 ${
+            selectedItem === country ? "bg-blue-100 border-blue-400" : ""
+          }" onclick="selectItem('${country}')">${country}</button>
+        `).join("");
+      } else if (currentSubmodule === "MarketInsights") {
+        title.textContent = "Products";
+        subtitle.textContent = "Select a product to view market insights";
+        content.innerHTML = products.map(product => `
+          <button class="w-full text-left px-3 py-2 mb-1 rounded border border-slate-200 hover:bg-blue-50 hover:border-blue-300 ${
+            selectedItem === product ? "bg-blue-100 border-blue-400" : ""
+          }" onclick="selectItem('${product}')">${product}</button>
+        `).join("");
+      } else if (currentSubmodule === "CountriesSetup") {
+        title.textContent = "Countries";
+        subtitle.textContent = "Select a country to configure";
+        content.innerHTML = countries.map(country => `
+          <button class="w-full text-left px-3 py-2 mb-1 rounded border border-slate-200 hover:bg-blue-50 hover:border-blue-300 ${
+            selectedItem === country ? "bg-blue-100 border-blue-400" : ""
+          }" onclick="selectItem('${country}')">${country}</button>
+        `).join("");
+      } else if (currentSubmodule === "ProductsFamilies") {
+        title.textContent = "Products/Families";
+        subtitle.textContent = "Not yet defined";
+        content.innerHTML = '<div class="text-center text-slate-500 py-8">Not yet defined - placeholder</div>';
+      } else if (currentSubmodule === "Pricing") {
+        title.textContent = "Pricing";
+        subtitle.textContent = "Not yet defined";
+        content.innerHTML = '<div class="text-center text-slate-500 py-8">Not yet defined - placeholder</div>';
+      } else if (currentSubmodule === "Users") {
+        title.textContent = "Users & Groups";
+        subtitle.textContent = "Manage users and groups";
+        content.innerHTML = `
+          <div class="mb-3 flex gap-2">
+            <button class="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700">New ADGroup or User</button>
+            <button class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+          </div>
+          <div class="border-t border-slate-200 pt-3">
+            <div class="flex border-b border-slate-200 mb-2">
+              <button class="px-3 py-1 text-xs font-semibold border-b-2 border-blue-500" onclick="switchUsersTab('groups')">Groups</button>
+              <button class="px-3 py-1 text-xs text-slate-600" onclick="switchUsersTab('users')">Users</button>
+            </div>
+            <div id="usersTabContent">
+              ${renderUsersTab()}
+            </div>
+          </div>
+        `;
+      } else if (currentSubmodule === "Scenarios") {
+        title.textContent = "Scenarios";
+        subtitle.textContent = "Not yet defined";
+        content.innerHTML = '<div class="text-center text-slate-500 py-8">Not yet defined - placeholder</div>';
+      }
+    }
+
+    let usersTab = "groups";
+    function switchUsersTab(tab) {
+      usersTab = tab;
+      document.getElementById("usersTabContent").innerHTML = renderUsersTab();
+      document.querySelectorAll("#centerPanelContent button").forEach((btn, idx) => {
+        if (idx < 2) {
+          btn.className = idx === (tab === "groups" ? 0 : 1) 
+            ? "px-3 py-1 text-xs font-semibold border-b-2 border-blue-500"
+            : "px-3 py-1 text-xs text-slate-600";
+        }
+      });
+    }
+
+    function renderUsersTab() {
+      if (usersTab === "groups") {
+        return groups.map(group => `
+          <button class="w-full text-left px-3 py-2 mb-1 rounded border border-slate-200 hover:bg-blue-50 hover:border-blue-300 ${
+            selectedItem === group ? "bg-blue-100 border-blue-400" : ""
+          }" onclick="selectItem('${group}')">${group}</button>
+        `).join("");
+      } else {
+        return users.map(user => `
+          <button class="w-full text-left px-3 py-2 mb-1 rounded border border-slate-200 hover:bg-blue-50 hover:border-blue-300 ${
+            selectedItem === user.id ? "bg-blue-100 border-blue-400" : ""
+          }" onclick="selectItem(${user.id})">
+            <div class="font-semibold">${user.name}</div>
+            <div class="text-xs text-slate-500">${user.email}</div>
+            <div class="text-xs text-slate-400">${user.group}</div>
+          </button>
+        `).join("");
+      }
+    }
+
+    function renderRightPanel(module) {
+      const content = document.getElementById("rightPanelContent");
+      const title = document.getElementById("rightPanelTitle");
+      const subtitle = document.getElementById("rightPanelSubtitle");
+
+      if (!selectedItem && currentSubmodule !== "SalesData") {
+        title.textContent = "Details / Editing";
+        subtitle.textContent = "Select an item from the center panel";
+        content.innerHTML = '<div class="text-center text-slate-500 py-8">Select an item to edit</div>';
+        return;
+      }
+
+      if (currentSubmodule === "PatientsNewsDropouts") {
+        if (!selectedItem) {
+          content.innerHTML = '<div class="text-center text-slate-500 py-8">Select a country first</div>';
+          return;
+        }
+        title.textContent = `Patients News/Dropouts - ${selectedItem}`;
+        subtitle.textContent = "Edit patient data by product and month";
+        content.innerHTML = renderMatrix(products, months, ["Patients", "Dose", "Vol."], selectedItem);
+      } else if (currentSubmodule === "SalesData") {
+        title.textContent = "Sales Data";
+        subtitle.textContent = "Edit sales data by product and month";
+        content.innerHTML = renderMatrix(products, months, ["Vol.", "Price", "TurnOver"], null);
+      } else if (currentSubmodule === "MarketInsights") {
+        if (!selectedItem) {
+          content.innerHTML = '<div class="text-center text-slate-500 py-8">Select a product first</div>';
+          return;
+        }
+        title.textContent = `Market Insights - ${selectedItem}`;
+        subtitle.textContent = "Edit market data by company";
+        const columns = ["Units", "Units (000)", "Sales Market $ (MM)", "ASP $/vial", "Change '23/20"];
+        content.innerHTML = renderMatrix(companies, columns, ["Value"], selectedItem, true);
+      } else if (currentSubmodule === "CountriesSetup") {
+        if (!selectedItem) {
+          content.innerHTML = '<div class="text-center text-slate-500 py-8">Select a country first</div>';
+          return;
+        }
+        title.textContent = `Country Setup - ${selectedItem}`;
+        subtitle.textContent = "Configure country settings";
+        content.innerHTML = `
+          <form class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Currency</label>
+              <select class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                ${currencies.map(c => `<option>${c}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Prices Types</label>
+              <select class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option>ASP</option>
+                <option>Maquila</option>
+                <option>Ex-Factory</option>
+              </select>
+            </div>
+            <div class="pt-4 border-t border-slate-200">
+              <button type="button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Save Changes</button>
+            </div>
+          </form>
+        `;
+      } else if (currentSubmodule === "Users") {
+        if (!selectedItem) {
+          content.innerHTML = '<div class="text-center text-slate-500 py-8">Select a user or group first</div>';
+          return;
+        }
+        title.textContent = usersTab === "groups" ? `Group: ${selectedItem}` : `User: ${users.find(u => u.id === selectedItem)?.name || ""}`;
+        subtitle.textContent = "Assign countries and functions";
+        content.innerHTML = `
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Cumulative Selected Countries</label>
+              <select multiple class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-48">
+                ${countries.map(c => `<option>${c}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Cumulative Selected Functions</label>
+              <select multiple class="w-full px-3 py-2 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-48">
+                <option>DataEntry</option>
+                <option>MasterData</option>
+                <option>Supervisor</option>
+              </select>
+            </div>
+          </div>
+          <div class="pt-4 border-t border-slate-200 mt-4">
+            <button type="button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">Save Changes</button>
+          </div>
+        `;
+      } else {
+        title.textContent = "Details";
+        subtitle.textContent = "Not yet defined";
+        content.innerHTML = '<div class="text-center text-slate-500 py-8">Not yet defined - placeholder</div>';
+      }
+    }
+
+    function renderMatrix(rows, cols, intersectionFields, context, isMarketInsights = false) {
+      const isReadOnly = (col) => isMarketInsights && col === "Change '23/20";
+      
+      let html = '<div class="overflow-x-auto">';
+      html += '<table class="w-full border-collapse text-xs">';
+      
+      // Header
+      html += '<thead><tr class="bg-slate-100">';
+      html += '<th class="border border-slate-300 px-2 py-2 text-left font-semibold sticky left-0 bg-slate-100 z-10"></th>';
+      cols.forEach(col => {
+        html += `<th class="border border-slate-300 px-2 py-2 text-center font-semibold ${isReadOnly(col) ? "bg-slate-200" : ""}">${col}</th>`;
+      });
+      html += '</tr></thead>';
+      
+      // Body
+      html += '<tbody>';
+      rows.forEach((row, rowIdx) => {
+        intersectionFields.forEach((field, fieldIdx) => {
+          html += '<tr>';
+          if (fieldIdx === 0) {
+            html += `<td class="border border-slate-300 px-2 py-2 font-semibold bg-slate-50 sticky left-0 z-10" rowspan="${intersectionFields.length}">${row}</td>`;
+          }
+          cols.forEach((col, colIdx) => {
+            const cellId = `${rowIdx}-${colIdx}-${fieldIdx}`;
+            const cellKey = `${row}-${col}-${field}`;
+            const isCalc = isReadOnly(col);
+            const value = getCellValue(cellKey, isCalc ? "0.0%" : "");
+            
+            html += `<td class="border border-slate-300 px-2 py-1 text-center ${isCalc ? "cell-readonly" : "cell-editable"}" 
+              data-cell-id="${cellId}" 
+              data-cell-key="${cellKey}"
+              data-readonly="${isCalc}"
+              onclick="${isCalc ? "" : `editCell('${cellId}', '${cellKey}')`}">${value}</td>`;
+          });
+          html += '</tr>';
+        });
+      });
+      html += '</tbody></table></div>';
+      
+      return html;
+    }
+
+    const cellData = {};
+    function getCellValue(key, defaultValue = "") {
+      return cellData[key] !== undefined ? cellData[key] : defaultValue;
+    }
+
+    function editCell(cellId, cellKey) {
+      if (editingCell === cellId) return;
+      
+      const cell = document.querySelector(`[data-cell-id="${cellId}"]`);
+      if (!cell || cell.dataset.readonly === "true") return;
+      
+      editingCell = cellId;
+      const currentValue = getCellValue(cellKey, "");
+      
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "cell-input";
+      input.value = currentValue;
+      input.onblur = () => {
+        cellData[cellKey] = input.value;
+        cell.textContent = input.value || "";
+        cell.classList.remove("bg-blue-100");
+        editingCell = null;
+      };
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          input.blur();
+        } else if (e.key === "Escape") {
+          cell.textContent = currentValue;
+          cell.classList.remove("bg-blue-100");
+          editingCell = null;
+        }
+      };
+      
+      cell.innerHTML = "";
+      cell.appendChild(input);
+      cell.classList.add("bg-blue-100");
+      input.focus();
+      input.select();
+    }
+
+    function selectItem(item) {
+      selectedItem = item;
+      renderContent();
+      renderMenu();
+    }
+
+    function renderPlaceholder(message) {
+      document.getElementById("centerPanelContent").innerHTML = `<div class="text-center text-slate-500 py-8">${message}</div>`;
+      document.getElementById("rightPanelContent").innerHTML = `<div class="text-center text-slate-500 py-8">${message}</div>`;
+    }
+
+    // Initialize
+    renderMenu();
+    renderContent();
+  </script>
+</body>
+</html>
+
