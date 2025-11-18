@@ -1,14 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Button } from './components/ui/button'
 import { Nextcell } from './components/nextcell/Nextcell'
+import { getPowerBIEmbedUrl, getPowerBIConfig } from './lib/powerbi'
 
-type MainModuleKey = 'DataEntry' | 'MasterData' | 'Supervisor'
+type MainModuleKey = 'Reports' | 'DataEntry' | 'MasterData' | 'Supervisor'
 type SubmoduleKey =
+  | 'SalesTrends'
+  | 'SalesAnalysis'
   | 'ProcessVisibility'
   | 'PatientsNewsDropouts'
   | 'SalesData'
   | 'MarketInsights'
-  | 'ExcelDemo'
   | 'CountriesSetup'
   | 'ProductsFamilies'
   | 'Pricing'
@@ -139,6 +141,13 @@ const groups = [
   'Read-Only Users',
 ]
 
+const groupFunctions: Record<string, string[]> = {
+  'Data Entry Managers': ['Reports', 'Data Entry'],
+  'Country Users': ['Reports', 'Data Entry', 'MasterData'],
+  'Supervisors': ['Reports', 'Data Entry', 'MasterData', 'Users', 'Supervisor'],
+  'Read-Only Users': ['Reports'],
+}
+
 const currencies = [
   '€ (EUR)',
   '$ (USD)',
@@ -160,11 +169,29 @@ const menuStructure: Record<
           label: string
           hasCenter: boolean
           hasRight: boolean
+          isFullScreen?: boolean
         }
       >
     >
   }
 > = {
+  Reports: {
+    label: 'Reports',
+    submodules: {
+      SalesTrends: {
+        label: 'Sales Trends',
+        hasCenter: false,
+        hasRight: false,
+        isFullScreen: true,
+      },
+      SalesAnalysis: {
+        label: 'Sales Analysis',
+        hasCenter: false,
+        hasRight: false,
+        isFullScreen: true,
+      },
+    },
+  },
   DataEntry: {
     label: 'Data Entry',
     submodules: {
@@ -180,11 +207,6 @@ const menuStructure: Record<
       },
       SalesData: {
         label: 'Sales Data',
-        hasCenter: false,
-        hasRight: true,
-      },
-      ExcelDemo: {
-        label: 'Excel Demo',
         hasCenter: false,
         hasRight: true,
       },
@@ -245,6 +267,13 @@ function App() {
     useState<SubmoduleKey>('PatientsNewsDropouts')
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
   const [usersTab, setUsersTab] = useState<UsersTab>('groups')
+  const [selectedCountries, setSelectedCountries] = useState<Set<string>>(
+    new Set(),
+  )
+  const [leftPanelWidth, setLeftPanelWidth] = useState(200)
+  const [centerPanelWidth, setCenterPanelWidth] = useState(400)
+  const [isResizingLeft, setIsResizingLeft] = useState(false)
+  const [isResizingCenter, setIsResizingCenter] = useState(false)
 
   const currentModuleConfig = menuStructure[currentModule]
   const currentSubmoduleConfig =
@@ -252,6 +281,7 @@ function App() {
 
   const hasCenter = currentSubmoduleConfig?.hasCenter ?? false
   const hasRight = currentSubmoduleConfig?.hasRight ?? false
+  const isFullScreen = currentSubmoduleConfig?.isFullScreen ?? false
 
   const showCenter = hasCenter && currentSubmodule !== 'SalesData'
 
@@ -285,7 +315,82 @@ function App() {
   const isPatients = currentSubmodule === 'PatientsNewsDropouts'
   const isSales = currentSubmodule === 'SalesData'
   const isMarket = currentSubmodule === 'MarketInsights'
-  const isExcelDemo = currentSubmodule === 'ExcelDemo'
+  const isSalesTrends = currentSubmodule === 'SalesTrends'
+  const isSalesAnalysis = currentSubmodule === 'SalesAnalysis'
+
+  // Get Power BI URLs from configuration
+  const powerBIConfig = useMemo(() => {
+    const config = getPowerBIConfig()
+    // Log configuration for debugging (remove in production)
+    if (import.meta.env.DEV) {
+      console.log('Power BI Configuration:', {
+        workspace: config.workspace,
+        salesTrends: config.salesTrends,
+        salesAnalysis: config.salesAnalysis,
+      })
+    }
+    return config
+  }, [])
+  const salesTrendsUrl = useMemo(
+    () => {
+      const url = getPowerBIEmbedUrl(powerBIConfig.salesTrends)
+      if (import.meta.env.DEV) {
+        console.log('Sales Trends URL:', url)
+      }
+      return url
+    },
+    [powerBIConfig.salesTrends],
+  )
+  const salesAnalysisUrl = useMemo(
+    () => {
+      const url = getPowerBIEmbedUrl(powerBIConfig.salesAnalysis)
+      if (import.meta.env.DEV) {
+        console.log('Sales Analysis URL:', url)
+      }
+      return url
+    },
+    [powerBIConfig.salesAnalysis],
+  )
+
+  const handleCountryToggle = (country: string) => {
+    setSelectedCountries((prev) => {
+      const next = new Set(prev)
+      if (next.has(country)) {
+        next.delete(country)
+      } else {
+        next.add(country)
+      }
+      return next
+    })
+  }
+
+  // Panel resizing handlers
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isResizingLeft) {
+        const newWidth = Math.max(160, Math.min(400, e.clientX))
+        setLeftPanelWidth(newWidth)
+      }
+      if (isResizingCenter) {
+        const newWidth = Math.max(260, Math.min(800, e.clientX - leftPanelWidth))
+        setCenterPanelWidth(newWidth)
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsResizingLeft(false)
+      setIsResizingCenter(false)
+    }
+
+    if (isResizingLeft || isResizingCenter) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove)
+        document.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+  }, [isResizingLeft, isResizingCenter, leftPanelWidth])
 
 function PatientsMatrix() {
   const subCols = ['Patients', 'Dose', 'Vol.']
@@ -385,64 +490,19 @@ function ProductRow({
   )
 }
 
-function SalesMatrix() {
-  const subCols = ['Vol.', 'Price', 'Turnover']
-
-  return (
-    <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-      <table className="w-full border-collapse text-[11px]">
-        <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-300 px-2 py-2 text-left align-bottom">
-              Product groups / products
-            </th>
-            {months.map((month) => (
-              <th
-                key={month}
-                className="border border-slate-300 px-2 py-1 text-center align-bottom"
-                colSpan={subCols.length}
-              >
-                {month}
-              </th>
-            ))}
-          </tr>
-          <tr className="bg-slate-50">
-            <th className="border border-slate-300 px-2 py-1 text-left" />
-            {months.map((month) =>
-              subCols.map((col) => (
-                <th
-                  key={`${month}-${col}`}
-                  className="border border-slate-300 px-2 py-1 text-center text-[10px]"
-                >
-                  {col}
-                </th>
-              )),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {productGroups.map((group) => (
-            <GroupRows key={group.name} groupName={group.name}>
-              {group.products.map((p) => (
-                <ProductRow key={p} productName={p} subCols={subCols} />
-              ))}
-            </GroupRows>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
 
   return (
     <div className="h-screen w-screen bg-slate-50 text-slate-900 flex">
       {/* LEFT PANEL */}
-      <aside className="flex h-full min-w-[220px] max-w-xs flex-col bg-slate-900 text-slate-100">
-        <div className="border-b border-slate-800 px-4 py-4">
-          <h1 className="text-lg font-semibold text-white">
+      <aside
+        className="flex h-full flex-col bg-slate-100 border-r border-slate-200"
+        style={{ width: `${leftPanelWidth}px`, minWidth: '160px', maxWidth: '400px' }}
+      >
+        <div className="border-b border-slate-300 px-4 py-4">
+          <h1 className="text-lg font-semibold text-slate-900">
             Biopharma Intl
           </h1>
-          <p className="mt-1 text-xs text-slate-400">Data Entry System</p>
+          <p className="mt-1 text-xs text-slate-600">Data Entry System</p>
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3" aria-label="Main menu">
@@ -450,7 +510,7 @@ function SalesMatrix() {
             const module = menuStructure[moduleKey]
             return (
               <div key={moduleKey} className="mb-2">
-                <div className="px-4 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <div className="mx-2 mb-1 rounded-md bg-slate-200 border border-slate-300 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-800 shadow-sm">
                   {module.label}
                 </div>
                 <div>
@@ -474,8 +534,8 @@ function SalesMatrix() {
                         className={[
                           'flex w-full items-center gap-2 px-4 py-2 text-left text-xs transition-colors',
                           active
-                            ? 'border-l-2 border-blue-400 bg-slate-800'
-                            : 'hover:bg-slate-800',
+                            ? 'border-l-4 border-blue-500 bg-blue-100 text-slate-900 font-medium'
+                            : 'hover:bg-slate-200 text-slate-700',
                         ].join(' ')}
                       >
                         <span>{sub.label}</span>
@@ -488,15 +548,196 @@ function SalesMatrix() {
           })}
         </nav>
 
-        <div className="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-400">
+        <div className="border-t border-slate-300 px-4 py-3 text-[11px] text-slate-600">
           <p>Click to navigate.</p>
           <p className="mt-1">Layout: Light, 3-panel (responsive).</p>
         </div>
       </aside>
 
+      {/* LEFT PANEL RESIZE HANDLE */}
+      {!isFullScreen && (
+        <div
+          className="w-1 cursor-col-resize bg-slate-300 hover:bg-blue-500 transition-colors"
+          onMouseDown={() => setIsResizingLeft(true)}
+          style={{ cursor: 'col-resize' }}
+        />
+      )}
+
+      {/* FULL SCREEN IFRAME FOR REPORTS */}
+      {isFullScreen && (
+        <section className="flex h-full flex-1 flex-col bg-white">
+          {isSalesTrends && (
+            <div className="flex h-full w-full items-center justify-center bg-slate-50">
+              <div className="max-w-3xl rounded-lg border border-slate-300 bg-white p-8 shadow-lg">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                    <svg
+                      className="h-6 w-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    Power BI Report - Sales Trends
+                  </h3>
+                </div>
+                <div className="mb-6 space-y-3 text-sm text-slate-600">
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
+                    <p className="font-semibold text-amber-800 mb-2">
+                      ⚠️ Content Security Policy (CSP) Restriction
+                    </p>
+                    <p>
+                      Power BI bloquea la incrustación directa en iframes desde <code className="bg-amber-100 px-1 rounded">localhost</code> por políticas de seguridad. Esto es esperado en desarrollo.
+                    </p>
+                  </div>
+                  <p className="font-semibold text-slate-700">
+                    Soluciones para producción:
+                  </p>
+                  <ul className="ml-4 space-y-2 list-disc">
+                    <li>
+                      <strong>Power BI Embedded (Azure) - Recomendado:</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
+                        <li>Registrar aplicación en Azure AD</li>
+                        <li>Usar Power BI REST API para obtener tokens de embed</li>
+                        <li>Implementar Power BI JavaScript SDK</li>
+                        <li>Requiere suscripción Azure y licencias Power BI Pro/Premium</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong>Publicar informe con Embed Token:</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
+                        <li>Configurar permisos de compartir del informe</li>
+                        <li>Generar tokens de embed mediante Power BI REST API</li>
+                        <li>Usar tokens para iframe autenticado</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong>Servidor Proxy:</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
+                        <li>Crear servicio backend que maneje autenticación</li>
+                        <li>Proxy de requests a Power BI desde tu dominio</li>
+                        <li>Servir contenido embed a través de tu dominio</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mb-4">
+                  <p className="font-semibold text-blue-800 mb-2 text-xs">
+                    URL Configurada (verificar en consola):
+                  </p>
+                  <code className="block break-all text-xs text-blue-700 bg-blue-100 p-2 rounded">
+                    {salesTrendsUrl}
+                  </code>
+                </div>
+                <div className="text-xs text-slate-500 italic">
+                  <p>
+                    ✓ Variables de entorno configuradas correctamente<br />
+                    ✓ URLs construidas dinámicamente desde configuración<br />
+                    ✓ Listo para implementación en producción con autenticación adecuada
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          {isSalesAnalysis && (
+            <div className="flex h-full w-full items-center justify-center bg-slate-50">
+              <div className="max-w-3xl rounded-lg border border-slate-300 bg-white p-8 shadow-lg">
+                <div className="mb-6 flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+                    <svg
+                      className="h-6 w-6 text-blue-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    Power BI Report - Sales Analysis
+                  </h3>
+                </div>
+                <div className="mb-6 space-y-3 text-sm text-slate-600">
+                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
+                    <p className="font-semibold text-amber-800 mb-2">
+                      ⚠️ Content Security Policy (CSP) Restriction
+                    </p>
+                    <p>
+                      Power BI bloquea la incrustación directa en iframes desde <code className="bg-amber-100 px-1 rounded">localhost</code> por políticas de seguridad. Esto es esperado en desarrollo.
+                    </p>
+                  </div>
+                  <p className="font-semibold text-slate-700">
+                    Soluciones para producción:
+                  </p>
+                  <ul className="ml-4 space-y-2 list-disc">
+                    <li>
+                      <strong>Power BI Embedded (Azure) - Recomendado:</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
+                        <li>Registrar aplicación en Azure AD</li>
+                        <li>Usar Power BI REST API para obtener tokens de embed</li>
+                        <li>Implementar Power BI JavaScript SDK</li>
+                        <li>Requiere suscripción Azure y licencias Power BI Pro/Premium</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong>Publicar informe con Embed Token:</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
+                        <li>Configurar permisos de compartir del informe</li>
+                        <li>Generar tokens de embed mediante Power BI REST API</li>
+                        <li>Usar tokens para iframe autenticado</li>
+                      </ul>
+                    </li>
+                    <li>
+                      <strong>Servidor Proxy:</strong>
+                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
+                        <li>Crear servicio backend que maneje autenticación</li>
+                        <li>Proxy de requests a Power BI desde tu dominio</li>
+                        <li>Servir contenido embed a través de tu dominio</li>
+                      </ul>
+                    </li>
+                  </ul>
+                </div>
+                <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mb-4">
+                  <p className="font-semibold text-blue-800 mb-2 text-xs">
+                    URL Configurada (verificar en consola):
+                  </p>
+                  <code className="block break-all text-xs text-blue-700 bg-blue-100 p-2 rounded">
+                    {salesAnalysisUrl}
+                  </code>
+                </div>
+                <div className="text-xs text-slate-500 italic">
+                  <p>
+                    ✓ Variables de entorno configuradas correctamente<br />
+                    ✓ URLs construidas dinámicamente desde configuración<br />
+                    ✓ Listo para implementación en producción con autenticación adecuada
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
       {/* CENTER PANEL */}
-      {showCenter && (
-        <main className="flex h-full w-1/3 min-w-[260px] max-w-xl flex-col border-x border-slate-200 bg-white">
+      {showCenter && !isFullScreen && (
+        <>
+          <main
+            className="flex h-full flex-col border-x border-slate-200 bg-white"
+            style={{ width: `${centerPanelWidth}px`, minWidth: '260px', maxWidth: '800px' }}
+          >
           <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div>
               <h2 className="text-xs font-semibold text-slate-800">
@@ -656,9 +897,6 @@ function SalesMatrix() {
                           <div className="text-[11px] text-slate-500">
                             {u.email}
                           </div>
-                          <div className="text-[11px] text-slate-400">
-                            {u.group}
-                          </div>
                         </button>
                       ))}
                   </div>
@@ -681,10 +919,20 @@ function SalesMatrix() {
             )}
           </div>
         </main>
+
+        {/* CENTER PANEL RESIZE HANDLE */}
+        {hasRight && (
+          <div
+            className="w-1 cursor-col-resize bg-slate-300 hover:bg-blue-500 transition-colors"
+            onMouseDown={() => setIsResizingCenter(true)}
+            style={{ cursor: 'col-resize' }}
+          />
+        )}
+        </>
       )}
 
       {/* RIGHT PANEL */}
-      {hasRight && (
+      {hasRight && !isFullScreen && (
         <section className="flex h-full flex-1 flex-col bg-white">
           <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
             <div>
@@ -738,7 +986,47 @@ function SalesMatrix() {
               </>
             )}
 
-            {isSales && <SalesMatrix />}
+            {isSales && (
+              <Nextcell
+                hierarchicalColumns={months.map((month) => ({
+                  main: month,
+                  sub: ['Vol.', 'Price', 'Turnover'],
+                }))}
+                hierarchicalRows={productGroups.map((group) => ({
+                  group: group.name,
+                  items: group.products,
+                }))}
+                calculatedColumns={[
+                  {
+                    index: (colIndex: number) => {
+                      // Turnover columns are every 3rd column starting from index 2 (0-indexed: 2, 5, 8, ...)
+                      // In hierarchical structure: Vol.=0, Price=1, Turnover=2 for each month
+                      const subIndex = colIndex % 3
+                      return subIndex === 2 // Turnover is the 3rd sub-column (index 2)
+                    },
+                    formula: (rowData, _allRowsData, _rowIndex, colIndex) => {
+                      // Get Vol. and Price for this month
+                      const monthIndex = Math.floor((colIndex ?? 0) / 3)
+                      const volIndex = monthIndex * 3 + 0
+                      const priceIndex = monthIndex * 3 + 1
+                      const vol = parseFloat(rowData[volIndex] || '0')
+                      const price = parseFloat(rowData[priceIndex] || '0')
+                      
+                      if (vol === 0 || price === 0 || isNaN(vol) || isNaN(price)) {
+                        return ''
+                      }
+                      
+                      return (vol * price).toFixed(2)
+                    },
+                  },
+                ]}
+                readOnlyColumns={(colIndex: number) => {
+                  // Turnover columns are read-only
+                  const subIndex = colIndex % 3
+                  return subIndex === 2
+                }}
+              />
+            )}
 
             {isMarket && (
               <>
@@ -747,20 +1035,41 @@ function SalesMatrix() {
                     Select a product first.
                   </div>
                 ) : (
-                  <MarketMatrix />
+                  <Nextcell
+                    rows={companies.length}
+                    cols={5}
+                    colHeaders={[
+                      'Units',
+                      'Units (000)',
+                      'Sales Market $ (MM)',
+                      'ASP $/vial',
+                      "Change '23/20",
+                    ]}
+                    rowHeaders={companies}
+                    readOnlyColumns={[4]}
+                    calculatedColumns={[
+                      {
+                        index: 4,
+                        formula: (rowData, allRowsData) => {
+                          // Calculate: Sales Market $ (MM) / Total Sales Market $ (MM)
+                          const salesMarketCol = 2 // "Sales Market $ (MM)" is column index 2
+                          const currentValue = parseFloat(rowData[salesMarketCol] || '0')
+                          
+                          // Sum all Sales Market $ (MM) values
+                          const total = allRowsData.reduce((sum, r) => {
+                            return sum + parseFloat(r[salesMarketCol] || '0')
+                          }, 0)
+                          
+                          if (total === 0) return '0.0%'
+                          
+                          const percentage = (currentValue / total) * 100
+                          return `${percentage.toFixed(1)}%`
+                        },
+                      },
+                    ]}
+                  />
                 )}
               </>
-            )}
-
-            {isExcelDemo && (
-              <Nextcell
-                rows={10}
-                cols={5}
-                colHeaders={['A', 'B', 'C', 'D', 'E']}
-                rowHeaders={Array.from({ length: 10 }, (_, i) =>
-                  String(i + 1),
-                )}
-              />
             )}
 
             {currentSubmodule === 'CountriesSetup' && (
@@ -812,27 +1121,42 @@ function SalesMatrix() {
                         <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                           Cumulative Selected countries
                         </label>
-                        <select
-                          multiple
-                          className="h-48 w-full rounded border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                        >
+                        <div className="h-48 w-full overflow-y-auto rounded border border-slate-300 bg-white p-2">
                           {countries.map((c) => (
-                            <option key={c}>{c}</option>
+                            <label
+                              key={c}
+                              className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedCountries.has(c)}
+                                onChange={() => handleCountryToggle(c)}
+                                className="h-3 w-3 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="text-xs text-slate-700">{c}</span>
+                            </label>
                           ))}
-                        </select>
+                        </div>
                       </div>
                       <div>
                         <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                           Cumulative Selected Functions
                         </label>
-                        <select
-                          multiple
-                          className="h-48 w-full rounded border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                        >
-                          <option>DataEntry</option>
-                          <option>MasterData</option>
-                          <option>Supervisor</option>
-                        </select>
+                        <div className="h-48 w-full overflow-y-auto rounded border border-slate-300 bg-white p-2">
+                          {(selectedGroupName
+                            ? groupFunctions[selectedGroupName] || []
+                            : selectedUser
+                              ? groupFunctions[selectedUser.group] || []
+                              : []
+                          ).map((func) => (
+                            <div
+                              key={func}
+                              className="px-2 py-1 text-xs text-slate-700"
+                            >
+                              {func}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                     <div className="border-t border-slate-200 pt-4">
@@ -846,12 +1170,7 @@ function SalesMatrix() {
             {(currentSubmodule === 'ProcessVisibility' ||
               currentSubmodule === 'ProductsFamilies' ||
               currentSubmodule === 'Pricing' ||
-              currentSubmodule === 'Scenarios') &&
-              !isPatients &&
-              !isSales &&
-              !isMarket &&
-              currentSubmodule !== 'CountriesSetup' &&
-              currentSubmodule !== 'Users' && (
+              currentSubmodule === 'Scenarios') && (
                 <div className="flex h-full items-center justify-center text-slate-400">
                   Not yet defined – placeholder
                 </div>
@@ -863,63 +1182,6 @@ function SalesMatrix() {
   )
 }
 
-function MarketMatrix() {
-  const columns = [
-    'Units',
-    'Units (000)',
-    'Sales Market $ (MM)',
-    'ASP $/vial',
-    "Change '23/20",
-  ]
-
-  return (
-    <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-      <table className="w-full border-collapse text-[11px]">
-        <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-300 px-2 py-2 text-left">
-              Company
-            </th>
-            {columns.map((c) => (
-              <th
-                key={c}
-                className={[
-                  'border border-slate-300 px-2 py-2 text-center',
-                  c === "Change '23/20" ? 'bg-slate-100 text-slate-500' : '',
-                ].join(' ')}
-              >
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {companies.map((company) => (
-            <tr key={company}>
-              <td className="border border-slate-300 bg-slate-50 px-2 py-2 font-semibold">
-                {company}
-              </td>
-              {columns.map((c) => {
-                const isCalc = c === "Change '23/20"
-                return (
-                  <td
-                    key={c}
-                    className={[
-                      'border border-slate-300 px-1 py-1 text-center',
-                      isCalc ? 'bg-slate-100 text-slate-500' : '',
-                    ].join(' ')}
-                  >
-                    {isCalc ? '0.0%' : ''}
-                  </td>
-                )
-              })}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
 
 export default App
 

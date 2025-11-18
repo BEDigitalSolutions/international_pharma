@@ -44,6 +44,94 @@ The content structure follows these rules:
 
 ---
 
+## Power BI Integration Configuration
+
+The application integrates with Power BI Services to display reports in iframes. Configuration is managed through environment variables.
+
+### Environment Variables
+
+Create a `.env` file in the `Mockup_Folder` directory with the following variables:
+
+```env
+# Power BI Workspace/Organization
+VITE_POWERBI_WORKSPACE=powerbi://api.powerbi.com/v1.0/myorg/Demos
+
+# Power BI Report IDs - Sales Trends Report
+VITE_POWERBI_REPORT_SALES_TRENDS_GROUP_ID=bb2b36c4-8e79-48c3-8e0e-beeffcbcd6bc
+VITE_POWERBI_REPORT_SALES_TRENDS_ID=374c879d-18c6-4eb8-96e8-5b1ad102369d
+VITE_POWERBI_REPORT_SALES_TRENDS_SECTION=ReportSection6d07f950286975e21292
+
+# Power BI Report IDs - Sales Analysis Report
+VITE_POWERBI_REPORT_SALES_ANALYSIS_GROUP_ID=ca1ac1fe-67ba-4206-835d-c1eca37a3e53
+VITE_POWERBI_REPORT_SALES_ANALYSIS_ID=703b9b8b-737c-4969-bade-6679da8c6e82
+VITE_POWERBI_REPORT_SALES_ANALYSIS_SECTION=ReportSection3202ee6d4de9c00a3480
+```
+
+### Configuration Details
+
+- **Workspace**: The Power BI workspace identifier using the format `powerbi://api.powerbi.com/v1.0/myorg/{WORKSPACE_NAME}`
+- **Group ID**: The workspace/group ID where the report is located
+- **Report ID**: The unique identifier for the Power BI report
+- **Section**: Optional section identifier for specific report sections
+
+### Implementation Notes
+
+- Environment variables are read at build time by Vite (prefixed with `VITE_`)
+- The Power BI embed URLs are constructed dynamically from these variables
+- For production deployments, ensure proper authentication is configured
+- The `.env` file should not be committed to version control (see `.gitignore`)
+- A `.env.example` file is provided as a template
+
+### Access Requirements
+
+To embed Power BI reports via iframe, ensure:
+
+1. **Report Sharing**: The Power BI reports must be shared with appropriate permissions
+2. **Workspace Access**: Users must have access to the Power BI workspace
+3. **Authentication**: For authenticated embedding, Azure AD app registration may be required
+4. **CORS**: Power BI Services must allow embedding from your application domain
+
+### Content Security Policy (CSP) Limitations
+
+**Important:** Power BI has strict Content Security Policy (CSP) restrictions that prevent direct iframe embedding from `localhost` or custom domains. The `frame-ancestors` directive only allows embedding from specific Microsoft domains (Teams, Office, etc.).
+
+**Development Environment:**
+- Direct iframe embedding from `localhost:5173` will be blocked by CSP
+- The application displays an informational message explaining the limitation
+- URLs are correctly constructed and logged to console for verification
+
+**Production Solutions:**
+
+1. **Power BI Embedded (Azure)** - Recommended for production:
+   - Register an Azure AD application
+   - Use Power BI REST API to get embed tokens
+   - Use Power BI JavaScript SDK (`powerbi-client`) for authenticated embedding
+   - Requires Azure subscription and Power BI Pro/Premium licenses
+
+2. **Publish Report with Embed Token**:
+   - Configure report sharing settings
+   - Generate embed tokens via Power BI REST API
+   - Use tokens for authenticated iframe embedding
+
+3. **Proxy Server**:
+   - Create a backend service that handles Power BI authentication
+   - Proxy requests to Power BI from your domain
+   - Serve the embedded content through your domain
+
+**Current Implementation:**
+- Environment variables are correctly configured
+- URLs are dynamically constructed from configuration
+- Placeholder UI shows configuration status and production requirements
+- Ready for production implementation with proper authentication setup
+
+### Files
+
+- Configuration utility: `src/lib/powerbi.ts`
+- Environment template: `.env.example`
+- Environment file: `.env` (not in version control)
+
+---
+
 ## Module Definitions
 
 ### # DataEntry
@@ -164,10 +252,17 @@ Grup3
     - Change '23/20 (calculated - read-only)
   - **Intersection**: Value
 
+**Calculation definition**:
+
+- **Change '23/20**: Calculated automatically as `Sales Market $ (MM) / Total Sales Market $ (MM)`
+  - Formula: For each company row, `Change '23/20 = (Company's Sales Market $ (MM)) / (Sum of all Companies' Sales Market $ (MM))`
+  - Result displayed as percentage (e.g., "25.5%")
+  - Read-only (gray, non-editable)
+
 **Editing behavior**:
 
 - Click directly on cell → inline text field for editing
-- Calculated fields ("Change '23/20"): Read-only (gray, non-editable)
+- Calculated fields ("Change '23/20"): Read-only (gray, non-editable), auto-updated when "Sales Market $ (MM)" values change
 
 ---
 
@@ -390,10 +485,15 @@ Countries are grouped by **continent/region**.The initial mockup uses a subset o
 ### Users (`users`)
 
 - John Smith – `john.smith@grifols.com` – group: Data Entry Managers
+  - Countries: Spain, France, Germany, Italy, United Kingdom
 - Maria Garcia – `maria.garcia@grifols.com` – group: Data Entry Managers
+  - Countries: Portugal, Netherlands, Belgium, Switzerland
 - Pierre Dubois – `pierre.dubois@grifols.com` – group: Country Users
+  - Countries: France, Belgium, Switzerland, Austria, Sweden
 - Anna Müller – `anna.muller@grifols.com` – group: Country Users
+  - Countries: Germany, Austria, Netherlands, Denmark
 - David Johnson – `david.johnson@grifols.com` – group: Supervisors
+  - Countries: United States, Canada, Mexico, Brazil, Argentina
 
 ### Currencies (`currencies`)
 

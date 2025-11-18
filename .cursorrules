@@ -1,0 +1,31 @@
+# Cursor Rules for C_Grifols_Pharma_Int Project
+
+## Custom Command: "revisar"
+
+When the user requests to "revisar" (review) a document with improvements and instructions:
+
+1. **Read the specified document** provided as a parameter in the request
+2. **Identify improvements** by looking for text marked with **bold** formatting - these indicate the start/end of each improvement
+3. **Extract each improvement** as a separate item
+4. **Generate a sequence of questions** to resolve doubts one by one
+5. **Present questions one at a time** and wait for the user's response before proceeding to the next question
+6. **Use an indented structure** for each point showing applicable actions or improvements
+7. **Do not cite implementation or workarounds** if they don't apply to the point being treated
+
+### Format for Questions
+
+When presenting questions, use this format:
+- Number each question (e.g., "Pregunta 1/10")
+- Be specific and clear
+- Provide multiple choice options when applicable (A, B, C, etc.)
+- Wait for user response before asking the next question
+- After all questions are answered, proceed with implementation
+
+### Example Usage
+
+User: "revisar @notas.md"
+- Read notas.md
+- Identify all text between **bold markers**
+- Generate questions for each improvement
+- Present questions sequentially
+

@@ -1,0 +1,15 @@
+{
+  "commands": {
+    "revisar": {
+      "description": "Revisa las mejoras e instrucciones en el documento indicado como parámetro. Los textos marcados con bold indican inicio/final de cada mejora. Indica dudas y preguntas en una secuencia de preguntas para resolverlas una a una.",
+      "prompt": "Revisa las mejoras e instrucciones en el documento @{document}. Los textos marcados con **bold** indican inicio/final de cada mejora. Indícame dudas y preguntas en una secuencia de preguntas para resolverlas una a una. Usa una estructura indentada para cada punto mostrando las acciones o mejoras aplicables. No cites implementación ni workarounds si no aplican al punto tratado.",
+      "parameters": {
+        "document": {
+          "type": "file",
+          "description": "El documento que contiene las mejoras e instrucciones a revisar"
+        }
+      }
+    }
+  }
+}
+
