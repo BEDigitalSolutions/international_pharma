@@ -13,7 +13,6 @@ type SubmoduleKey =
   | 'MarketInsights'
   | 'CountriesSetup'
   | 'ProductsFamilies'
-  | 'Pricing'
   | 'Users'
   | 'Scenarios'
 
@@ -48,6 +47,38 @@ const countries = [
   'Argentina',
   'Chile',
 ]
+
+// Countries for Patients News/Dropouts (only Norway, Finland, Denmark)
+const patientsCountries = ['Norway', 'Finland', 'Denmark']
+
+// Countries grouped by continent for Countries Setup
+const countriesByContinent: Record<string, string[]> = {
+  Europe: [
+    'Spain',
+    'France',
+    'Germany',
+    'Italy',
+    'United Kingdom',
+    'Portugal',
+    'Netherlands',
+    'Belgium',
+    'Switzerland',
+    'Austria',
+    'Sweden',
+    'Norway',
+    'Denmark',
+    'Finland',
+    'Ireland',
+    'Poland',
+    'Czech Republic',
+    'Hungary',
+    'Greece',
+    'Romania',
+    'Bulgaria',
+  ],
+  'North America': ['United States', 'Canada', 'Mexico'],
+  'South America': ['Brazil', 'Argentina', 'Chile'],
+}
 
 const productGroups = [
   {
@@ -230,11 +261,6 @@ const menuStructure: Record<
         hasCenter: true,
         hasRight: true,
       },
-      Pricing: {
-        label: 'Pricing',
-        hasCenter: true,
-        hasRight: true,
-      },
     },
   },
   Supervisor: {
@@ -277,6 +303,7 @@ function App() {
   const [selectedCountries, setSelectedCountries] = useState<Set<string>>(
     new Set(),
   )
+  const [selectedContinent, setSelectedContinent] = useState<string>('')
   const [leftPanelWidth, setLeftPanelWidth] = useState(200)
   const [centerPanelWidth, setCenterPanelWidth] = useState(400)
   const [isResizingLeft, setIsResizingLeft] = useState(false)
@@ -284,6 +311,23 @@ function App() {
   const [exchangeRates, setExchangeRates] = useState<ExchangeRateRow[]>([
     { id: '1', contravalor: '', fechaInicial: '', fechaFinal: '' },
   ])
+  const [selectedPriceTypes, setSelectedPriceTypes] = useState<Set<string>>(
+    new Set(),
+  )
+
+  const priceTypes = ['ASP', 'Maquila', 'Ex-Factory']
+
+  const handlePriceTypeToggle = (priceType: string) => {
+    setSelectedPriceTypes((prev) => {
+      const next = new Set(prev)
+      if (next.has(priceType)) {
+        next.delete(priceType)
+      } else {
+        next.add(priceType)
+      }
+      return next
+    })
+  }
 
   const currentModuleConfig = menuStructure[currentModule]
   const currentSubmoduleConfig =
@@ -520,7 +564,7 @@ function ProductRow({
             const module = menuStructure[moduleKey]
             return (
               <div key={moduleKey} className="mb-2">
-                <div className="mx-2 mb-1 rounded-md bg-slate-200 border border-slate-300 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-800 shadow-sm">
+                <div className="mx-2 mb-1 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-800">
                   {module.label}
                 </div>
                 <div>
@@ -759,7 +803,6 @@ function ProductRow({
                   'Process Visibility'}
                 {currentSubmodule === 'ProductsFamilies' &&
                   'Products/Families'}
-                {currentSubmodule === 'Pricing' && 'Pricing'}
                 {currentSubmodule === 'Scenarios' && 'Scenarios'}
               </h2>
               <p className="text-[11px] text-slate-500">
@@ -780,7 +823,7 @@ function ProductRow({
           <div className="flex-1 overflow-y-auto px-3 py-3 text-xs">
             {currentSubmodule === 'PatientsNewsDropouts' && (
               <div className="space-y-1">
-                {countries.map((c) => (
+                {patientsCountries.map((c) => (
                   <button
                     key={c}
                     type="button"
@@ -819,22 +862,49 @@ function ProductRow({
             )}
 
             {currentSubmodule === 'CountriesSetup' && (
-              <div className="space-y-1">
-                {countries.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => handleSelectCountry(c)}
-                    className={[
-                      'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
-                      selectedCountryName === c
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
-                    ].join(' ')}
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-2 block text-xs font-semibold text-slate-700">
+                    Select Continent
+                  </label>
+                  <select
+                    value={selectedContinent}
+                    onChange={(e) => {
+                      setSelectedContinent(e.target.value)
+                      setSelectedItem(null) // Clear country selection when continent changes
+                    }}
+                    className="w-full rounded border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
                   >
-                    {c}
-                  </button>
-                ))}
+                    <option value="">-- Select Continent --</option>
+                    {Object.keys(countriesByContinent).map((continent) => (
+                      <option key={continent} value={continent}>
+                        {continent}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedContinent && (
+                  <div className="space-y-1">
+                    <label className="mb-2 block text-xs font-semibold text-slate-700">
+                      Countries in {selectedContinent}
+                    </label>
+                    {countriesByContinent[selectedContinent]?.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => handleSelectCountry(c)}
+                        className={[
+                          'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
+                          selectedCountryName === c
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
+                        ].join(' ')}
+                      >
+                        {c}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -921,7 +991,6 @@ function ProductRow({
             )}
 
             {(currentSubmodule === 'ProductsFamilies' ||
-              currentSubmodule === 'Pricing' ||
               currentSubmodule === 'Scenarios') && (
               <div className="flex h-full items-center justify-center text-slate-400">
                 Not yet defined – placeholder
@@ -957,7 +1026,6 @@ function ProductRow({
                   'Process Visibility'}
                 {currentSubmodule === 'ProductsFamilies' &&
                   'Products/Families'}
-                {currentSubmodule === 'Pricing' && 'Pricing'}
                 {currentSubmodule === 'Scenarios' && 'Scenarios'}
               </h2>
               <p className="text-[11px] text-slate-500">
@@ -1079,17 +1147,30 @@ function ProductRow({
                         index: 3,
                         formula: (rowData, allRowsData) => {
                           // Calculate: Market Share = Market Sales / Total Market Sales
-                          const marketSalesCol = 2 // "Market Sales" is column index 2
-                          const currentValue = parseFloat(rowData[marketSalesCol] || '0')
+                          // First, calculate Market Sales for current row: Units * ASP $/vial
+                          const unitsCol = 0 // Units is column index 0
+                          const aspCol = 1 // ASP $/vial is column index 1
+                          const units = parseFloat(rowData[unitsCol] || '0')
+                          const asp = parseFloat(rowData[aspCol] || '0')
                           
-                          // Sum all Market Sales values
-                          const total = allRowsData.reduce((sum, r) => {
-                            return sum + parseFloat(r[marketSalesCol] || '0')
+                          let currentMarketSales = 0
+                          if (units !== 0 && asp !== 0 && !isNaN(units) && !isNaN(asp)) {
+                            currentMarketSales = units * asp
+                          }
+                          
+                          // Calculate Market Sales for all rows and sum them
+                          const totalMarketSales = allRowsData.reduce((sum, r) => {
+                            const rUnits = parseFloat(r[unitsCol] || '0')
+                            const rAsp = parseFloat(r[aspCol] || '0')
+                            if (rUnits !== 0 && rAsp !== 0 && !isNaN(rUnits) && !isNaN(rAsp)) {
+                              return sum + (rUnits * rAsp)
+                            }
+                            return sum
                           }, 0)
                           
-                          if (total === 0) return '0.0%'
+                          if (totalMarketSales === 0) return '0.0%'
                           
-                          const percentage = (currentValue / total) * 100
+                          const percentage = (currentMarketSales / totalMarketSales) * 100
                           return `${percentage.toFixed(1)}%`
                         },
                       },
@@ -1121,11 +1202,26 @@ function ProductRow({
                       <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                         Prices Types
                       </label>
-                      <select className="w-full rounded border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none">
-                        <option>ASP</option>
-                        <option>Maquila</option>
-                        <option>Ex-Factory</option>
-                      </select>
+                      <div className="rounded border border-slate-300 bg-white">
+                        <div className="max-h-48 overflow-y-auto p-2">
+                          {priceTypes.map((priceType) => (
+                            <label
+                              key={priceType}
+                              className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer rounded"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedPriceTypes.has(priceType)}
+                                onChange={() => handlePriceTypeToggle(priceType)}
+                                className="h-3 w-3 text-blue-600 focus:ring-blue-500 rounded"
+                              />
+                              <span className="text-xs text-slate-700">
+                                {priceType}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                     
                     <div className="border-t border-slate-200 pt-4">
@@ -1303,7 +1399,6 @@ function ProductRow({
 
             {(currentSubmodule === 'ProcessVisibility' ||
               currentSubmodule === 'ProductsFamilies' ||
-              currentSubmodule === 'Pricing' ||
               currentSubmodule === 'Scenarios') && (
                 <div className="flex h-full items-center justify-center text-slate-400">
                   Not yet defined – placeholder

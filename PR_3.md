@@ -7,7 +7,7 @@ The application uses a **three-panel layout** with the following default proport
 - **Left Panel (Menu)**: 1/8 of screen width (approximately 200px, resizable between 160px-400px)
   - Background: Light (bg-slate-100)
   - Selected menu item: Highlighted with blue background (bg-blue-100) and left border (border-l-4 border-blue-500)
-  - H1 menu levels (Reports, Data Entry, Master Data, Supervisor): Highlighted with background (bg-slate-200), border, and bold font
+  - H1 menu levels (Reports, Data Entry, Master Data, Supervisor): No specific background, displayed with bold font, uppercase, and tracking-wide styling
 - **Center Panel (Selection)**: 2/6 of screen width (resizable)
 - **Right Panel (Editing)**: 3/6 of screen width (resizable)
 
@@ -175,6 +175,7 @@ To embed Power BI reports via iframe, ensure:
 **Center Panel (H3)**:
 
 - List of Countries (selectable)
+  - Only displays: Norway, Finland, Denmark
 
 **Right Panel (H4)**:
 
@@ -313,13 +314,21 @@ Grup3
 
 **Center Panel (H3)**:
 
-- List of Countries (Country1, Country2, Country3, ...) - selectable
+- Continent dropdown selector
+  - Options: Europe, North America, South America
+  - When a continent is selected, displays a list of countries for that continent
+  - Countries are selectable buttons
+  - Changing continent clears the selected country
 
 **Right Panel (H4)**:
 
 - Form structure: "Title : Data : Entry Type : (Available Values)"
   - **Currency**: Dropdown (€, $, YEN, Peso, ... [full list])
-  - **Prices Types**: Dropdown (ASP, Maquila, Ex-Factory)
+  - **Prices Types**: Multiple selection dropdown with checkboxes
+    - Values: ASP, Maquila, Ex-Factory
+    - Selection method: Checkboxes to the left of each option for multiple selection
+    - Display: Scrollable list in a bordered container
+    - Behavior: Users can select multiple price types simultaneously
   - **Tipo de cambio €**: Table with the following structure:
     - **Title**: "Tipo de cambio €"
     - **Columns**:
@@ -339,12 +348,6 @@ Grup3
 ---
 
 #### ## Products/Families
-
-*Status: Not yet defined - placeholder*
-
----
-
-#### ## Pricing
 
 *Status: Not yet defined - placeholder*
 
