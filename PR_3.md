@@ -4,15 +4,19 @@
 
 The application uses a **three-panel layout** with the following default proportions:
 
-- **Left Panel (Menu)**: 1/6 of screen width
-- **Center Panel (Selection)**: 2/6 of screen width
-- **Right Panel (Editing)**: 3/6 of screen width
+- **Left Panel (Menu)**: 1/8 of screen width (approximately 200px, resizable between 160px-400px)
+  - Background: Light (bg-slate-100)
+  - Selected menu item: Highlighted with blue background (bg-blue-100) and left border (border-l-4 border-blue-500)
+  - H1 menu levels (Reports, Data Entry, Master Data, Supervisor): Highlighted with background (bg-slate-200), border, and bold font
+- **Center Panel (Selection)**: 2/6 of screen width (resizable)
+- **Right Panel (Editing)**: 3/6 of screen width (resizable)
 
 ### Layout Exceptions
 
 Some modules may use different layouts:
 
-- **Sales Data**: No center panel (1/6 - 0 - 5/6)
+- **Sales Data**: No center panel (1/8 - 0 - 7/8)
+- **Reports** (Sales Trends, Sales Analysis): Full-screen iframe layout (1/8 - 0 - 7/8, iframe takes full remaining space)
 - All other modules: Standard 3-panel layout
 
 ### Panel Resizing
@@ -134,6 +138,30 @@ To embed Power BI reports via iframe, ensure:
 
 ## Module Definitions
 
+### # Reports
+
+#### ## Sales Trends
+
+**Layout**: Full-screen iframe (1/8 - 0 - 7/8)
+
+**Right Panel (H4)**:
+
+- Full-screen Power BI iframe displaying Sales Trends report
+- URL configured via environment variables
+- Note: In development (localhost), CSP restrictions prevent direct embedding; informational message is displayed instead
+
+#### ## Sales Analysis
+
+**Layout**: Full-screen iframe (1/8 - 0 - 7/8)
+
+**Right Panel (H4)**:
+
+- Full-screen Power BI iframe displaying Sales Analysis report
+- URL configured via environment variables
+- Note: In development (localhost), CSP restrictions prevent direct embedding; informational message is displayed instead
+
+---
+
 ### # DataEntry
 
 #### ## ProcessVisibility
@@ -190,7 +218,7 @@ Grup3
 
 #### ## Sales Data
 
-**Layout**: Special layout - No center panel (1/6 - 0 - 5/6)
+**Layout**: Special layout - No center panel (1/8 - 0 - 7/8)
 
 **Right Panel (H4)**:
 
@@ -227,7 +255,12 @@ Grup3
 **Editing behavior**:
 
 - Click directly on cell → inline text field for editing
-- Calculated fields (if any): Read-only (gray, non-editable)
+- **Group headers (Grup1, Grup2, etc.)**: Left-aligned (not centered), read-only, displayed with background highlight
+- **Turnover columns**: Calculated automatically as `Vol. × Price`
+  - Formula: `Turnover = Vol. × Price` (only calculates if both Vol. and Price have values)
+  - Read-only (gray, non-editable)
+  - Auto-updates when Vol. or Price changes
+- **Volume highlighting**: If Vol. for a month is 100% or more higher than the previous month, the cell background is highlighted in orange (bg-orange-200)
 - Groups can be expanded/collapsed to show/hide products
 
 ---
@@ -245,24 +278,30 @@ Grup3
 - Data matrix structure:
   - **Rows**: Companies (Company1, Company2, Company3, Company4, ...)
   - **Columns**:
-    - Units
-    - Units (000)
-    - Sales Market $ (MM)
-    - ASP $/vial
-    - Change '23/20 (calculated - read-only)
+    - Units (editable)
+    - ASP $/vial (editable)
+    - Market Sales (calculated - read-only)
+    - MarketShare (calculated - read-only)
   - **Intersection**: Value
 
-**Calculation definition**:
+**Calculation definitions**:
 
-- **Change '23/20**: Calculated automatically as `Sales Market $ (MM) / Total Sales Market $ (MM)`
-  - Formula: For each company row, `Change '23/20 = (Company's Sales Market $ (MM)) / (Sum of all Companies' Sales Market $ (MM))`
+- **Market Sales**: Calculated automatically as `Units × ASP $/vial`
+  - Formula: `Market Sales = Units × ASP $/vial`
+  - Only calculates if both Units and ASP $/vial have values
+  - Read-only (gray, non-editable)
+  - Auto-updates when Units or ASP $/vial changes
+
+- **MarketShare**: Calculated automatically as `Market Sales / Total Market Sales`
+  - Formula: For each company row, `MarketShare = (Company's Market Sales) / (Sum of all Companies' Market Sales)`
   - Result displayed as percentage (e.g., "25.5%")
   - Read-only (gray, non-editable)
+  - Auto-updates when any Market Sales value changes
 
 **Editing behavior**:
 
 - Click directly on cell → inline text field for editing
-- Calculated fields ("Change '23/20"): Read-only (gray, non-editable), auto-updated when "Sales Market $ (MM)" values change
+- Calculated fields (Market Sales, MarketShare): Read-only (gray, non-editable), auto-updated when source values change
 
 ---
 
@@ -281,6 +320,19 @@ Grup3
 - Form structure: "Title : Data : Entry Type : (Available Values)"
   - **Currency**: Dropdown (€, $, YEN, Peso, ... [full list])
   - **Prices Types**: Dropdown (ASP, Maquila, Ex-Factory)
+  - **Tipo de cambio €**: Table with the following structure:
+    - **Title**: "Tipo de cambio €"
+    - **Columns**:
+      - Contravalor (text input, editable)
+      - Fecha inicial (date input with calendar selector or direct entry with short date format DD/MM/YYYY)
+      - Fecha Final (date input with calendar selector or direct entry with short date format DD/MM/YYYY)
+      - Acción (delete button for each row)
+    - **Behavior**:
+      - Multiple rows supported (add/remove rows dynamically)
+      - "+ Agregar fila" button to add new rows
+      - Delete button (✕) appears for each row when there is more than one row
+      - Date fields support both calendar picker and direct text entry
+      - Date format: DD/MM/YYYY (short date format)
 
 **Optional**: Search/filter field in center panel (not critical for initial mockup)
 
@@ -317,9 +369,24 @@ Grup3
 
 - **Two-column layout** (side by side):
   - **Left column**: Countries assignment
-    - Field: "Cumulative Selected countries" - Dropdown (full list of countries)
+    - Field: "Cumulative Selected countries"
+    - Checkboxes to the left of each country name for multiple selection
+    - Scrollable list with all countries
   - **Right column**: Functions assignment
-    - Field: "Cumulative Selected Functions" - Dropdown (DataEntry, MasterData, Supervisor)
+    - Field: "Cumulative Selected Functions"
+    - Functions are automatically assigned based on selected group/user:
+      - **Data Entry Managers**: Reports, Data Entry
+      - **Country Users**: Reports, Data Entry, MasterData
+      - **Supervisors**: Reports, Data Entry, MasterData, Users, Supervisor
+      - **Read-Only Users**: Reports
+    - Functions are displayed as read-only list (not editable dropdown)
+
+**Center Panel - Users Tab**:
+
+- User cards display only:
+  - Name (font-semibold)
+  - Email (text-slate-500)
+  - Profile/group information is not displayed in the card
 
 **Optional**: Search/filter field in center panel (not critical for initial mockup)
 

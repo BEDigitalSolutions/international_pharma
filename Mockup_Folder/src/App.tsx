@@ -261,6 +261,13 @@ type SelectedItem =
   | { type: 'user'; value: number }
   | null
 
+interface ExchangeRateRow {
+  id: string
+  contravalor: string
+  fechaInicial: string
+  fechaFinal: string
+}
+
 function App() {
   const [currentModule, setCurrentModule] = useState<MainModuleKey>('DataEntry')
   const [currentSubmodule, setCurrentSubmodule] =
@@ -274,6 +281,9 @@ function App() {
   const [centerPanelWidth, setCenterPanelWidth] = useState(400)
   const [isResizingLeft, setIsResizingLeft] = useState(false)
   const [isResizingCenter, setIsResizingCenter] = useState(false)
+  const [exchangeRates, setExchangeRates] = useState<ExchangeRateRow[]>([
+    { id: '1', contravalor: '', fechaInicial: '', fechaFinal: '' },
+  ])
 
   const currentModuleConfig = menuStructure[currentModule]
   const currentSubmoduleConfig =
@@ -1037,27 +1047,44 @@ function ProductRow({
                 ) : (
                   <Nextcell
                     rows={companies.length}
-                    cols={5}
+                    cols={4}
                     colHeaders={[
                       'Units',
-                      'Units (000)',
-                      'Sales Market $ (MM)',
                       'ASP $/vial',
-                      "Change '23/20",
+                      'Market Sales',
+                      'MarketShare',
                     ]}
                     rowHeaders={companies}
-                    readOnlyColumns={[4]}
+                    readOnlyColumns={[2, 3]}
                     calculatedColumns={[
                       {
-                        index: 4,
-                        formula: (rowData, allRowsData) => {
-                          // Calculate: Sales Market $ (MM) / Total Sales Market $ (MM)
-                          const salesMarketCol = 2 // "Sales Market $ (MM)" is column index 2
-                          const currentValue = parseFloat(rowData[salesMarketCol] || '0')
+                        index: 2,
+                        formula: (rowData, _allRowsData, _rowIndex, _colIndex) => {
+                          // Calculate: Market Sales = Units * ASP $/vial
+                          const unitsCol = 0 // Units is column index 0
+                          const aspCol = 1 // ASP $/vial is column index 1
+                          const units = parseFloat(rowData[unitsCol] || '0')
+                          const asp = parseFloat(rowData[aspCol] || '0')
                           
-                          // Sum all Sales Market $ (MM) values
+                          if (units === 0 || asp === 0 || isNaN(units) || isNaN(asp)) {
+                            return ''
+                          }
+                          
+                          // Market Sales = Units * ASP $/vial
+                          const result = units * asp
+                          return result.toFixed(2)
+                        },
+                      },
+                      {
+                        index: 3,
+                        formula: (rowData, allRowsData) => {
+                          // Calculate: Market Share = Market Sales / Total Market Sales
+                          const marketSalesCol = 2 // "Market Sales" is column index 2
+                          const currentValue = parseFloat(rowData[marketSalesCol] || '0')
+                          
+                          // Sum all Market Sales values
                           const total = allRowsData.reduce((sum, r) => {
-                            return sum + parseFloat(r[salesMarketCol] || '0')
+                            return sum + parseFloat(r[marketSalesCol] || '0')
                           }, 0)
                           
                           if (total === 0) return '0.0%'
@@ -1079,7 +1106,7 @@ function ProductRow({
                     Select a country in the center panel.
                   </div>
                 ) : (
-                  <div className="max-w-md space-y-4">
+                  <div className="max-w-2xl space-y-6">
                     <div>
                       <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                         Currency
@@ -1100,6 +1127,113 @@ function ProductRow({
                         <option>Ex-Factory</option>
                       </select>
                     </div>
+                    
+                    <div className="border-t border-slate-200 pt-4">
+                      <h3 className="mb-3 text-sm font-semibold text-slate-800">
+                        Tipo de cambio €
+                      </h3>
+                      <div className="overflow-x-auto rounded border border-slate-300">
+                        <table className="w-full border-collapse text-xs">
+                          <thead>
+                            <tr className="bg-slate-100">
+                              <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
+                                Contravalor
+                              </th>
+                              <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
+                                Fecha inicial
+                              </th>
+                              <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
+                                Fecha Final
+                              </th>
+                              <th className="border border-slate-300 px-3 py-2 text-center font-semibold text-slate-700 w-20">
+                                Acción
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {exchangeRates.map((row, index) => (
+                              <tr key={row.id}>
+                                <td className="border border-slate-300 p-0">
+                                  <input
+                                    type="text"
+                                    value={row.contravalor}
+                                    onChange={(e) => {
+                                      const newRates = [...exchangeRates]
+                                      newRates[index].contravalor = e.target.value
+                                      setExchangeRates(newRates)
+                                    }}
+                                    className="h-8 w-full border-0 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder="Contravalor"
+                                  />
+                                </td>
+                                <td className="border border-slate-300 p-0">
+                                  <input
+                                    type="date"
+                                    value={row.fechaInicial}
+                                    onChange={(e) => {
+                                      const newRates = [...exchangeRates]
+                                      newRates[index].fechaInicial = e.target.value
+                                      setExchangeRates(newRates)
+                                    }}
+                                    className="h-8 w-full border-0 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder="DD/MM/YYYY"
+                                  />
+                                </td>
+                                <td className="border border-slate-300 p-0">
+                                  <input
+                                    type="date"
+                                    value={row.fechaFinal}
+                                    onChange={(e) => {
+                                      const newRates = [...exchangeRates]
+                                      newRates[index].fechaFinal = e.target.value
+                                      setExchangeRates(newRates)
+                                    }}
+                                    className="h-8 w-full border-0 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    placeholder="DD/MM/YYYY"
+                                  />
+                                </td>
+                                <td className="border border-slate-300 p-1 text-center">
+                                  {exchangeRates.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setExchangeRates(
+                                          exchangeRates.filter((_, i) => i !== index),
+                                        )
+                                      }}
+                                      className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                                      title="Eliminar fila"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div className="border-t border-slate-300 bg-slate-50 px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setExchangeRates([
+                                ...exchangeRates,
+                                {
+                                  id: Date.now().toString(),
+                                  contravalor: '',
+                                  fechaInicial: '',
+                                  fechaFinal: '',
+                                },
+                              ])
+                            }}
+                            className="text-xs text-blue-600 hover:text-blue-800"
+                          >
+                            + Agregar fila
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
                     <div className="border-t border-slate-200 pt-4">
                       <Button size="md">Save changes</Button>
                     </div>
