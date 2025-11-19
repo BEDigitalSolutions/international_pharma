@@ -36,9 +36,6 @@ export interface NextcellProps {
   readOnlyColumns?: number[] | ((colIndex: number) => boolean)
 }
 
-// Re-export for convenience
-export type { HierarchicalColumn, HierarchicalRow, CalculatedColumn }
-
 export interface CellPosition {
   row: number
   col: number

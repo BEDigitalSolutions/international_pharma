@@ -5,9 +5,6 @@ import type {
   CellKey,
   NextcellProps,
   CellPosition,
-  HierarchicalColumn,
-  HierarchicalRow,
-  CalculatedColumn,
 } from './types'
 
 export function Nextcell({
@@ -55,6 +52,7 @@ export function Nextcell({
         itemIndex: -1,
         isGroupHeader: false,
         label: rowHeaders?.[i] ?? (i + 1).toString(),
+        groupName: undefined as string | undefined,
       }))
     }
 
@@ -143,7 +141,6 @@ export function Nextcell({
   const [isSelecting, setIsSelecting] = useState(false)
   const [selectionStart, setSelectionStart] = useState<CellPosition | null>(null)
   const [editingCell, setEditingCell] = useState<CellKey | null>(null)
-  const [filledCells, setFilledCells] = useState<Set<CellKey>>(new Set())
 
   const inputRefs = useRef<Record<CellKey, HTMLInputElement | null>>({})
   const fillSourceValueRef = useRef<string>('')
