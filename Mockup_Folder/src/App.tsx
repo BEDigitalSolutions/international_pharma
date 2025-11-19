@@ -192,103 +192,6 @@ function App() {
     }
   }, [isResizingLeft, isResizingCenter, leftPanelWidth])
 
-function PatientsMatrix() {
-  const subCols = ['Patients', 'Dose', 'Vol.']
-
-  return (
-    <div className="overflow-x-auto rounded border border-slate-200 bg-white">
-      <table className="w-full border-collapse text-[11px]">
-        <thead>
-          <tr className="bg-slate-100">
-            <th className="border border-slate-300 px-2 py-2 text-left align-bottom">
-              Product groups / products
-            </th>
-            {months.map((month) => (
-              <th
-                key={month}
-                className="border border-slate-300 px-2 py-1 text-center align-bottom"
-                colSpan={subCols.length}
-              >
-                {month}
-              </th>
-            ))}
-          </tr>
-          <tr className="bg-slate-50">
-            <th className="border border-slate-300 px-2 py-1 text-left" />
-            {months.map((month) =>
-              subCols.map((col) => (
-                <th
-                  key={`${month}-${col}`}
-                  className="border border-slate-300 px-2 py-1 text-center text-[10px]"
-                >
-                  {col}
-                </th>
-              )),
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {productGroups.map((group) => (
-            <GroupRows key={group.name} groupName={group.name}>
-              {group.products.map((p) => (
-                <ProductRow key={p} productName={p} subCols={subCols} />
-              ))}
-            </GroupRows>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function GroupRows({
-  groupName,
-  children,
-}: {
-  groupName: string
-  children: React.ReactNode
-}) {
-  return (
-    <>
-      <tr className="bg-slate-50">
-        <td
-          className="border border-slate-300 px-2 py-2 font-semibold"
-          colSpan={1 + months.length * 3}
-        >
-          {groupName}
-        </td>
-      </tr>
-      {children}
-    </>
-  )
-}
-
-function ProductRow({
-  productName,
-  subCols,
-}: {
-  productName: string
-  subCols: string[]
-}) {
-  return (
-    <tr>
-      <td className="border border-slate-300 px-2 py-2">{productName}</td>
-      {months.map((month) =>
-        subCols.map((col) => (
-          <td
-            key={`${productName}-${month}-${col}`}
-            className="border border-slate-300 px-1 py-1 text-center align-middle"
-          >
-            <input
-              className="h-7 w-full rounded border border-slate-200 bg-white px-1 text-[10px] focus:border-blue-500 focus:outline-none"
-              aria-label={`${productName} ${month} ${col}`}
-            />
-          </td>
-        )),
-      )}
-    </tr>
-  )
-}
 
 
   return (
@@ -468,19 +371,19 @@ function ProductRow({
                   </select>
                 </div>
                 {selectedContinent && (
-                  <div className="space-y-1">
+              <div className="space-y-1">
                     <label className="mb-2 block text-xs font-semibold text-slate-700">
                       Countries in {selectedContinent}
                     </label>
                     {countriesByContinent[selectedContinent]?.map((c) => (
                       <SelectionButton
-                        key={c}
+                    key={c}
                         isSelected={selectedCountryName === c}
-                        onClick={() => handleSelectCountry(c)}
-                      >
-                        {c}
+                    onClick={() => handleSelectCountry(c)}
+                  >
+                    {c}
                       </SelectionButton>
-                    ))}
+                ))}
                   </div>
                 )}
               </div>
@@ -625,7 +528,51 @@ function ProductRow({
                     Select a country first.
                   </div>
                 ) : (
-                  <PatientsMatrix />
+                  <>
+                    <Nextcell
+                      hierarchicalColumns={months.map((month) => ({
+                        main: month,
+                        sub: ['Patients', 'Dose', 'Vol.'],
+                      }))}
+                      hierarchicalRows={productGroups.map((group) => ({
+                        group: group.name,
+                        items: group.products,
+                      }))}
+                      calculatedColumns={[
+                        {
+                          index: (colIndex: number) => {
+                            // Vol. columns are every 3rd column starting from index 2 (0-indexed: 2, 5, 8, ...)
+                            // In hierarchical structure: Patients=0, Dose=1, Vol.=2 for each month
+                            const subIndex = colIndex % 3
+                            return subIndex === 2 // Vol. is the 3rd sub-column (index 2)
+                          },
+                          formula: (rowData, _allRowsData, _rowIndex, colIndex) => {
+                            // Get Patients and Dose for this month
+                            const monthIndex = Math.floor((colIndex ?? 0) / 3)
+                            const patientsIndex = monthIndex * 3 + 0
+                            const doseIndex = monthIndex * 3 + 1
+                            const patients = parseFloat(rowData[patientsIndex] || '0')
+                            const dose = parseFloat(rowData[doseIndex] || '0')
+                            
+                            if (patients === 0 || dose === 0 || isNaN(patients) || isNaN(dose)) {
+                              return ''
+                            }
+                            
+                            return (patients * dose).toFixed(2)
+                          },
+                        },
+                      ]}
+                      readOnlyColumns={(colIndex: number) => {
+                        // Vol. columns are read-only (calculated)
+                        const subIndex = colIndex % 3
+                        return subIndex === 2
+                      }}
+                    />
+                    <div className="mt-3 text-[10px] text-slate-500 space-y-1">
+                      <p><strong>Keyboard navigation:</strong> Arrow keys, Tab, Enter | <strong>Selection:</strong> Click + Shift/Ctrl for multi-select</p>
+                      <p><strong>Copy/Paste:</strong> Ctrl+C / Ctrl+V (Excel compatible) | <strong>Fill handle:</strong> Drag blue corner to replicate values</p>
+                    </div>
+                  </>
                 )}
               </>
             )}
