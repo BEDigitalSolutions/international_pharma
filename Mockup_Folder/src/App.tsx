@@ -1127,7 +1127,7 @@ function ProductRow({
                     calculatedColumns={[
                       {
                         index: 2,
-                        formula: (rowData, _allRowsData, _rowIndex, _colIndex) => {
+                        formula: (rowData) => {
                           // Calculate: Market Sales = Units * ASP $/vial
                           const unitsCol = 0 // Units is column index 0
                           const aspCol = 1 // ASP $/vial is column index 1

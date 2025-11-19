@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { Download, Trash2 } from 'lucide-react'
 import { Button } from '../ui/button'
 import type {
@@ -95,43 +95,6 @@ export function Nextcell({
     return mapping
   }, [hierarchicalRows, rows, rowHeaders])
 
-  // Build column mapping: flat index -> { main, sub, subIndex }
-  const colMapping = useMemo(() => {
-    if (!hierarchicalColumns) {
-      return Array.from({ length: cols }, (_, i) => ({
-        flatIndex: i,
-        mainIndex: -1,
-        subIndex: -1,
-        mainLabel: colHeaders?.[i] ?? String.fromCharCode('A'.charCodeAt(0) + i),
-        subLabel: '',
-      }))
-    }
-
-    const mapping: Array<{
-      flatIndex: number
-      mainIndex: number
-      subIndex: number
-      mainLabel: string
-      subLabel: string
-    }> = []
-
-    let flatIdx = 0
-    hierarchicalColumns.forEach((col, mainIdx) => {
-      col.sub.forEach((sub, subIdx) => {
-        mapping.push({
-          flatIndex: flatIdx,
-          mainIndex: mainIdx,
-          subIndex: subIdx,
-          mainLabel: col.main,
-          subLabel: sub,
-        })
-        flatIdx += 1
-      })
-    })
-
-    return mapping
-  }, [hierarchicalColumns, cols, colHeaders])
-
   const [data, setData] = useState<Record<CellKey, string>>(initialData ?? {})
   const [selectedCells, setSelectedCells] = useState<Set<CellKey>>(new Set())
   const [focusedCell, setFocusedCell] = useState<CellPosition>({
@@ -141,10 +104,23 @@ export function Nextcell({
   const [isSelecting, setIsSelecting] = useState(false)
   const [selectionStart, setSelectionStart] = useState<CellPosition | null>(null)
   const [editingCell, setEditingCell] = useState<CellKey | null>(null)
+  const [isFilling, setIsFilling] = useState(false)
+  const [, setFilledCells] = useState<Set<CellKey>>(new Set())
 
   const inputRefs = useRef<Record<CellKey, HTMLInputElement | null>>({})
   const fillSourceValueRef = useRef<string>('')
   const isFillingRef = useRef<boolean>(false)
+
+  const registerInputRef = useCallback(
+    (cellKey: CellKey) => (el: HTMLInputElement | null) => {
+      if (el) {
+        inputRefs.current[cellKey] = el
+      } else {
+        delete inputRefs.current[cellKey]
+      }
+    },
+    [],
+  )
 
   const getCellKey = (row: number, col: number): CellKey => `${row}-${col}`
 
@@ -648,6 +624,7 @@ export function Nextcell({
     const sourceValue = getCellValue(row, col)
     fillSourceValueRef.current = sourceValue
     isFillingRef.current = true
+    setIsFilling(true)
 
     const sourceCellKey = getCellKey(row, col)
     setFilledCells(new Set([sourceCellKey]))
@@ -694,6 +671,7 @@ export function Nextcell({
       document.removeEventListener('mousemove', handleGlobalMouseMove, true)
       document.removeEventListener('mouseup', cleanup, true)
       isFillingRef.current = false
+      setIsFilling(false)
       fillSourceValueRef.current = ''
       setFilledCells(new Set())
     }
@@ -917,9 +895,7 @@ export function Nextcell({
                 onMouseUp={handleMouseUp}
               >
                 <input
-                  ref={(el) => {
-                    inputRefs.current[cellKey] = el
-                  }}
+                  ref={registerInputRef(cellKey)}
                   type="text"
                   value={cellValue}
                   readOnly={isReadOnly || !isEditing}
@@ -939,7 +915,7 @@ export function Nextcell({
                     isReadOnly ? 'cursor-not-allowed' : '',
                   ].join(' ')}
                   style={{
-                    pointerEvents: isFillingRef.current ? 'none' : 'auto',
+                    pointerEvents: isFilling ? 'none' : 'auto',
                   }}
                 />
                 {!readOnly && !isReadOnly && isFocused && (
