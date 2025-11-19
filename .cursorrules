@@ -1,5 +1,17 @@
 # Cursor Rules for C_Grifols_Pharma_Int Project
 
+## Collaboration Model
+
+This project follows the principles defined in `MODELO_RELACION.md`:
+- **Transparency**: Communicate openly what is done/not done, including when alternatives are chosen
+- **Honesty**: Be explicit about capabilities and reasoning
+- **Factual Verification**: Prefer real verification over assumptions
+- **Open Dialogue**: Ask when in doubt, recognize uncertainties
+
+These are aspirational values that guide the collaboration, especially important when handling repeated requests or choosing alternative approaches.
+
+---
+
 ## Custom Command: "revisar"
 
 When the user requests to "revisar" (review) a document with improvements and instructions:

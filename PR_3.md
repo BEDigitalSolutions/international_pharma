@@ -50,7 +50,23 @@ The content structure follows these rules:
 
 ## Power BI Integration Configuration
 
-The application integrates with Power BI Services to display reports in iframes. Configuration is managed through environment variables.
+The application integrates with Power BI Services using **Power BI Embedded with Azure AD authentication**. This implementation uses the Power BI JavaScript SDK to securely embed reports with token-based authentication.
+
+### Architecture Overview
+
+```
+Frontend (React + PowerBI JavaScript SDK)
+    ↓ Request embed token
+Backend API (Node.js/Python/.NET)
+    ↓ Authenticate with Azure AD
+Azure AD (MSAL)
+    ↓ Get access token
+Power BI REST API
+    ↓ Generate embed token
+Frontend
+    ↓ Embed report with token
+Power BI Service (Report displayed)
+```
 
 ### Environment Variables
 
@@ -69,70 +85,192 @@ VITE_POWERBI_REPORT_SALES_TRENDS_SECTION=ReportSection6d07f950286975e21292
 VITE_POWERBI_REPORT_SALES_ANALYSIS_GROUP_ID=ca1ac1fe-67ba-4206-835d-c1eca37a3e53
 VITE_POWERBI_REPORT_SALES_ANALYSIS_ID=703b9b8b-737c-4969-bade-6679da8c6e82
 VITE_POWERBI_REPORT_SALES_ANALYSIS_SECTION=ReportSection3202ee6d4de9c00a3480
+
+# Azure AD Configuration (for reference, actual auth happens in backend)
+VITE_AZURE_AD_CLIENT_ID=your-client-id
+VITE_AZURE_AD_TENANT_ID=your-tenant-id
+
+# Backend API URL (for embed token generation)
+VITE_BACKEND_API_URL=http://localhost:3000/api
 ```
+
+### Implementation Components
+
+#### 1. Frontend Components
+
+- **`PowerBIEmbed.tsx`**: React component that uses Power BI JavaScript SDK
+  - Fetches embed tokens from backend API
+  - Handles report lifecycle (loading, loaded, error events)
+  - Displays informative UI when backend is not configured
+  
+- **`lib/powerbi.ts`**: Power BI configuration and utilities
+  - `getPowerBIConfig()`: Reads report configuration from environment variables
+  - `getAzureADConfig()`: Reads Azure AD configuration
+  - `getEmbedToken()`: Calls backend API to obtain embed tokens
+  - `isAzureADConfigured()`: Validates configuration
+
+#### 2. Backend API (Required for Production)
+
+A backend API is **required** to securely generate embed tokens. The frontend cannot do this directly for security reasons (client secrets must never be exposed in frontend code).
+
+**Backend responsibilities:**
+1. Authenticate with Azure AD using MSAL (Microsoft Authentication Library)
+2. Call Power BI REST API to generate embed tokens
+3. Return embed token to frontend
+
+**Example endpoint:**
+```
+POST /api/powerbi/embed-token
+Body: { groupId: "...", reportId: "..." }
+Response: { token: "...", tokenId: "...", expiration: "..." }
+```
+
+See `POWERBI_EMBEDDED_SETUP.md` for complete backend implementation examples in:
+- Node.js + Express + MSAL
+- .NET Core + MSAL
+- Python + Flask + MSAL
 
 ### Configuration Details
 
-- **Workspace**: The Power BI workspace identifier using the format `powerbi://api.powerbi.com/v1.0/myorg/{WORKSPACE_NAME}`
-- **Group ID**: The workspace/group ID where the report is located
-- **Report ID**: The unique identifier for the Power BI report
-- **Section**: Optional section identifier for specific report sections
+- **Workspace**: The Power BI workspace identifier
+- **Group ID**: The workspace/group ID where the report is located (UUID format)
+- **Report ID**: The unique identifier for the Power BI report (UUID format)
+- **Section**: Optional section identifier for specific report pages
+- **Client ID**: Azure AD application (client) ID
+- **Tenant ID**: Azure AD directory (tenant) ID
 
-### Implementation Notes
+### Setup Requirements
 
-- Environment variables are read at build time by Vite (prefixed with `VITE_`)
-- The Power BI embed URLs are constructed dynamically from these variables
-- For production deployments, ensure proper authentication is configured
-- The `.env` file should not be committed to version control (see `.gitignore`)
-- A `.env.example` file is provided as a template
+To enable Power BI Embedded, you must complete the following setup steps:
 
-### Access Requirements
+#### 1. Azure AD App Registration
 
-To embed Power BI reports via iframe, ensure:
+1. Register application in Azure Active Directory
+2. Obtain Client ID and Tenant ID
+3. Create client secret (for backend use only)
+4. Configure API permissions:
+   - `Report.Read.All` (Delegated + Application)
+   - `Dataset.Read.All` (Delegated + Application)
+   - `Workspace.Read.All` (Delegated)
+5. Grant admin consent for your organization
 
-1. **Report Sharing**: The Power BI reports must be shared with appropriate permissions
-2. **Workspace Access**: Users must have access to the Power BI workspace
-3. **Authentication**: For authenticated embedding, Azure AD app registration may be required
-4. **CORS**: Power BI Services must allow embedding from your application domain
+#### 2. Power BI Configuration
 
-### Content Security Policy (CSP) Limitations
+1. Enable service principal in Power BI Admin Portal:
+   - Go to **Tenant Settings** → **Developer settings**
+   - Enable "Allow service principals to use Power BI APIs"
+2. Add service principal to Power BI workspace:
+   - Open your workspace (e.g., "Demos")
+   - Add the Azure AD application as **Member** or **Admin**
 
-**Important:** Power BI has strict Content Security Policy (CSP) restrictions that prevent direct iframe embedding from `localhost` or custom domains. The `frame-ancestors` directive only allows embedding from specific Microsoft domains (Teams, Office, etc.).
+#### 3. Backend API Deployment
 
-**Development Environment:**
-- Direct iframe embedding from `localhost:5173` will be blocked by CSP
-- The application displays an informational message explaining the limitation
-- URLs are correctly constructed and logged to console for verification
+Deploy a backend API that:
+- Authenticates with Azure AD using client credentials flow
+- Calls Power BI REST API to generate embed tokens
+- Exposes an endpoint for the frontend to request tokens
 
-**Production Solutions:**
+#### 4. Licenses
 
-1. **Power BI Embedded (Azure)** - Recommended for production:
-   - Register an Azure AD application
-   - Use Power BI REST API to get embed tokens
-   - Use Power BI JavaScript SDK (`powerbi-client`) for authenticated embedding
-   - Requires Azure subscription and Power BI Pro/Premium licenses
+**Required licenses:**
+- **Development**: Power BI Pro licenses
+- **Production**: 
+  - Power BI Premium (capacity-based, ~$5,000/month for P1)
+  - OR Power BI Embedded (Azure, pay-per-use, ~$1/hour for A1 SKU)
 
-2. **Publish Report with Embed Token**:
-   - Configure report sharing settings
-   - Generate embed tokens via Power BI REST API
-   - Use tokens for authenticated iframe embedding
+**Recommendation for this project:**
+- Power BI Embedded (A2 or A3 SKU) with auto-pause for cost optimization
+- Estimated cost: $200-400/month with nocturnal pauses
 
-3. **Proxy Server**:
-   - Create a backend service that handles Power BI authentication
-   - Proxy requests to Power BI from your domain
-   - Serve the embedded content through your domain
+### Current Implementation Status
 
-**Current Implementation:**
-- Environment variables are correctly configured
-- URLs are dynamically constructed from configuration
-- Placeholder UI shows configuration status and production requirements
-- Ready for production implementation with proper authentication setup
+**✅ Implemented:**
+- Power BI JavaScript SDK integration (`powerbi-client` package)
+- `PowerBIEmbed` component with full report lifecycle management
+- Environment variable configuration
+- Error handling and user-friendly messaging
+- Documentation for Azure AD setup (`POWERBI_EMBEDDED_SETUP.md`)
 
-### Files
+**⚠️ Pending (Requires Infrastructure):**
+- Azure AD app registration
+- Backend API deployment for embed token generation
+- Power BI workspace configuration with service principal
+- Power BI Premium or Embedded license acquisition
 
+**Current Behavior:**
+- Application displays informative UI explaining backend API requirement
+- Shows implementation steps and configuration guide
+- Links to official Microsoft documentation
+- Ready to integrate once backend API is deployed
+
+### Development Workflow
+
+**Without Backend (Current State):**
+```
+1. Frontend loads PowerBIEmbed component
+2. Component attempts to fetch embed token
+3. getEmbedToken() returns null (backend not configured)
+4. Component displays setup instructions UI
+```
+
+**With Backend (Production):**
+```
+1. Frontend loads PowerBIEmbed component
+2. Component calls getEmbedToken(groupId, reportId)
+3. Backend authenticates with Azure AD
+4. Backend generates embed token via Power BI REST API
+5. Frontend receives token and embeds report using SDK
+6. Report loads and displays in full-screen
+```
+
+### Security Considerations
+
+1. **Never expose client secrets in frontend**
+   - All authentication must happen in backend
+   - Use environment variables only for non-sensitive configuration
+   
+2. **Token management**
+   - Embed tokens expire after 1 hour by default
+   - Implement token refresh logic in production
+   - Use `report.on('tokenExpired')` event to refresh tokens
+
+3. **CORS configuration**
+   - Configure backend to allow requests only from trusted domains
+   - Use appropriate CORS headers in production
+
+4. **Row-Level Security (RLS)**
+   - Implement RLS in Power BI datasets for multi-tenant scenarios
+   - Pass user identity when generating embed tokens
+
+### Troubleshooting
+
+**Issue**: "Embed token not available. Backend API not configured."
+- **Solution**: Deploy backend API and configure `VITE_BACKEND_API_URL`
+
+**Issue**: "Service principal not found"
+- **Solution**: Add Azure AD application to Power BI workspace
+
+**Issue**: "Insufficient privileges"
+- **Solution**: Grant admin consent for API permissions in Azure AD
+
+**Issue**: Reports not loading
+- **Solution**: Check browser console for errors, verify token validity, ensure licenses are active
+
+### Additional Resources
+
+**Documentation:**
+- `POWERBI_EMBEDDED_SETUP.md`: Complete step-by-step configuration guide
+- [Power BI Embedded Documentation](https://learn.microsoft.com/en-us/power-bi/developer/embedded/)
+- [Power BI JavaScript SDK](https://github.com/microsoft/PowerBI-JavaScript)
+- [MSAL for Node.js](https://github.com/AzureAD/microsoft-authentication-library-for-js/tree/dev/lib/msal-node)
+- [Azure AD App Registration](https://learn.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
+
+**Implementation Files:**
+- Frontend component: `src/components/PowerBIEmbed.tsx`
 - Configuration utility: `src/lib/powerbi.ts`
 - Environment template: `.env.example`
 - Environment file: `.env` (not in version control)
+- Setup guide: `POWERBI_EMBEDDED_SETUP.md`
 
 ---
 

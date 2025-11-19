@@ -1,7 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Button } from './components/ui/button'
 import { Nextcell } from './components/nextcell/Nextcell'
-import { getPowerBIEmbedUrl, getPowerBIConfig } from './lib/powerbi'
+import { SelectionButton } from './components/common/SelectionButton'
+import { PriceTypeSelector } from './components/common/PriceTypeSelector'
+import {
+  ExchangeRateTable,
+  type ExchangeRateRow,
+} from './components/common/ExchangeRateTable'
+import { getPowerBIConfig } from './lib/powerbi'
+import { PowerBIEmbed } from './components/PowerBIEmbed'
 import {
   countries,
   patientsCountries,
@@ -24,13 +31,6 @@ type SelectedItem =
   | { type: 'group'; value: string }
   | { type: 'user'; value: number }
   | null
-
-interface ExchangeRateRow {
-  id: string
-  contravalor: string
-  fechaInicial: string
-  fechaFinal: string
-}
 
 function App() {
   const [currentModule, setCurrentModule] = useState<MainModuleKey>('DataEntry')
@@ -65,6 +65,34 @@ function App() {
       }
       return next
     })
+  }
+
+  const handleExchangeRateChange = (
+    index: number,
+    field: keyof ExchangeRateRow,
+    value: string,
+  ) => {
+    setExchangeRates((prev) => {
+      const next = [...prev]
+      next[index] = { ...next[index], [field]: value }
+      return next
+    })
+  }
+
+  const handleExchangeRateRemove = (index: number) => {
+    setExchangeRates((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleExchangeRateAdd = () => {
+    setExchangeRates((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString(),
+        contravalor: '',
+        fechaInicial: '',
+        fechaFinal: '',
+      },
+    ])
   }
 
   const currentModuleConfig = menuStructure[currentModule]
@@ -110,7 +138,7 @@ function App() {
   const isSalesTrends = currentSubmodule === 'SalesTrends'
   const isSalesAnalysis = currentSubmodule === 'SalesAnalysis'
 
-  // Get Power BI URLs from configuration
+  // Get Power BI configuration
   const powerBIConfig = useMemo(() => {
     const config = getPowerBIConfig()
     // Log configuration for debugging (remove in production)
@@ -123,26 +151,6 @@ function App() {
     }
     return config
   }, [])
-  const salesTrendsUrl = useMemo(
-    () => {
-      const url = getPowerBIEmbedUrl(powerBIConfig.salesTrends)
-      if (import.meta.env.DEV) {
-        console.log('Sales Trends URL:', url)
-      }
-      return url
-    },
-    [powerBIConfig.salesTrends],
-  )
-  const salesAnalysisUrl = useMemo(
-    () => {
-      const url = getPowerBIEmbedUrl(powerBIConfig.salesAnalysis)
-      if (import.meta.env.DEV) {
-        console.log('Sales Analysis URL:', url)
-      }
-      return url
-    },
-    [powerBIConfig.salesAnalysis],
-  )
 
   const handleCountryToggle = (country: string) => {
     setSelectedCountries((prev) => {
@@ -355,170 +363,20 @@ function ProductRow({
         />
       )}
 
-      {/* FULL SCREEN IFRAME FOR REPORTS */}
+      {/* FULL SCREEN POWER BI EMBEDDED FOR REPORTS */}
       {isFullScreen && (
         <section className="flex h-full flex-1 flex-col bg-white">
           {isSalesTrends && (
-            <div className="flex h-full w-full items-center justify-center bg-slate-50">
-              <div className="max-w-3xl rounded-lg border border-slate-300 bg-white p-8 shadow-lg">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                    <svg
-                      className="h-6 w-6 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    Power BI Report - Sales Trends
-                  </h3>
-                </div>
-                <div className="mb-6 space-y-3 text-sm text-slate-600">
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-                    <p className="font-semibold text-amber-800 mb-2">
-                      ⚠️ Content Security Policy (CSP) Restriction
-                    </p>
-                    <p>
-                      Power BI bloquea la incrustación directa en iframes desde <code className="bg-amber-100 px-1 rounded">localhost</code> por políticas de seguridad. Esto es esperado en desarrollo.
-                    </p>
-                  </div>
-                  <p className="font-semibold text-slate-700">
-                    Soluciones para producción:
-                  </p>
-                  <ul className="ml-4 space-y-2 list-disc">
-                    <li>
-                      <strong>Power BI Embedded (Azure) - Recomendado:</strong>
-                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
-                        <li>Registrar aplicación en Azure AD</li>
-                        <li>Usar Power BI REST API para obtener tokens de embed</li>
-                        <li>Implementar Power BI JavaScript SDK</li>
-                        <li>Requiere suscripción Azure y licencias Power BI Pro/Premium</li>
-                      </ul>
-                    </li>
-                    <li>
-                      <strong>Publicar informe con Embed Token:</strong>
-                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
-                        <li>Configurar permisos de compartir del informe</li>
-                        <li>Generar tokens de embed mediante Power BI REST API</li>
-                        <li>Usar tokens para iframe autenticado</li>
-                      </ul>
-                    </li>
-                    <li>
-                      <strong>Servidor Proxy:</strong>
-                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
-                        <li>Crear servicio backend que maneje autenticación</li>
-                        <li>Proxy de requests a Power BI desde tu dominio</li>
-                        <li>Servir contenido embed a través de tu dominio</li>
-                      </ul>
-                    </li>
-                  </ul>
-                </div>
-                <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mb-4">
-                  <p className="font-semibold text-blue-800 mb-2 text-xs">
-                    URL Configurada (verificar en consola):
-                  </p>
-                  <code className="block break-all text-xs text-blue-700 bg-blue-100 p-2 rounded">
-                    {salesTrendsUrl}
-                  </code>
-                </div>
-                <div className="text-xs text-slate-500 italic">
-                  <p>
-                    ✓ Variables de entorno configuradas correctamente<br />
-                    ✓ URLs construidas dinámicamente desde configuración<br />
-                    ✓ Listo para implementación en producción con autenticación adecuada
-                  </p>
-                </div>
-              </div>
-            </div>
+            <PowerBIEmbed
+              reportConfig={powerBIConfig.salesTrends}
+              title="Sales Trends Report"
+            />
           )}
           {isSalesAnalysis && (
-            <div className="flex h-full w-full items-center justify-center bg-slate-50">
-              <div className="max-w-3xl rounded-lg border border-slate-300 bg-white p-8 shadow-lg">
-                <div className="mb-6 flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                    <svg
-                      className="h-6 w-6 text-blue-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900">
-                    Power BI Report - Sales Analysis
-                  </h3>
-                </div>
-                <div className="mb-6 space-y-3 text-sm text-slate-600">
-                  <div className="rounded-lg bg-amber-50 border border-amber-200 p-4">
-                    <p className="font-semibold text-amber-800 mb-2">
-                      ⚠️ Content Security Policy (CSP) Restriction
-                    </p>
-                    <p>
-                      Power BI bloquea la incrustación directa en iframes desde <code className="bg-amber-100 px-1 rounded">localhost</code> por políticas de seguridad. Esto es esperado en desarrollo.
-                    </p>
-                  </div>
-                  <p className="font-semibold text-slate-700">
-                    Soluciones para producción:
-                  </p>
-                  <ul className="ml-4 space-y-2 list-disc">
-                    <li>
-                      <strong>Power BI Embedded (Azure) - Recomendado:</strong>
-                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
-                        <li>Registrar aplicación en Azure AD</li>
-                        <li>Usar Power BI REST API para obtener tokens de embed</li>
-                        <li>Implementar Power BI JavaScript SDK</li>
-                        <li>Requiere suscripción Azure y licencias Power BI Pro/Premium</li>
-                      </ul>
-                    </li>
-                    <li>
-                      <strong>Publicar informe con Embed Token:</strong>
-                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
-                        <li>Configurar permisos de compartir del informe</li>
-                        <li>Generar tokens de embed mediante Power BI REST API</li>
-                        <li>Usar tokens para iframe autenticado</li>
-                      </ul>
-                    </li>
-                    <li>
-                      <strong>Servidor Proxy:</strong>
-                      <ul className="ml-4 mt-1 space-y-1 list-circle text-xs">
-                        <li>Crear servicio backend que maneje autenticación</li>
-                        <li>Proxy de requests a Power BI desde tu dominio</li>
-                        <li>Servir contenido embed a través de tu dominio</li>
-                      </ul>
-                    </li>
-                  </ul>
-                </div>
-                <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 mb-4">
-                  <p className="font-semibold text-blue-800 mb-2 text-xs">
-                    URL Configurada (verificar en consola):
-                  </p>
-                  <code className="block break-all text-xs text-blue-700 bg-blue-100 p-2 rounded">
-                    {salesAnalysisUrl}
-                  </code>
-                </div>
-                <div className="text-xs text-slate-500 italic">
-                  <p>
-                    ✓ Variables de entorno configuradas correctamente<br />
-                    ✓ URLs construidas dinámicamente desde configuración<br />
-                    ✓ Listo para implementación en producción con autenticación adecuada
-                  </p>
-                </div>
-              </div>
-            </div>
+            <PowerBIEmbed
+              reportConfig={powerBIConfig.salesAnalysis}
+              title="Sales Analysis Report"
+            />
           )}
         </section>
       )}
@@ -562,19 +420,13 @@ function ProductRow({
             {currentSubmodule === 'PatientsNewsDropouts' && (
               <div className="space-y-1">
                 {patientsCountries.map((c) => (
-                  <button
+                  <SelectionButton
                     key={c}
-                    type="button"
+                    isSelected={selectedCountryName === c}
                     onClick={() => handleSelectCountry(c)}
-                    className={[
-                      'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
-                      selectedCountryName === c
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
-                    ].join(' ')}
                   >
                     {c}
-                  </button>
+                  </SelectionButton>
                 ))}
               </div>
             )}
@@ -582,19 +434,13 @@ function ProductRow({
             {currentSubmodule === 'MarketInsights' && (
               <div className="space-y-1">
                 {productsFlat.map((p) => (
-                  <button
+                  <SelectionButton
                     key={p}
-                    type="button"
+                    isSelected={selectedProductName === p}
                     onClick={() => handleSelectProduct(p)}
-                    className={[
-                      'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
-                      selectedProductName === p
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
-                    ].join(' ')}
                   >
                     {p}
-                  </button>
+                  </SelectionButton>
                 ))}
               </div>
             )}
@@ -627,19 +473,13 @@ function ProductRow({
                       Countries in {selectedContinent}
                     </label>
                     {countriesByContinent[selectedContinent]?.map((c) => (
-                      <button
+                      <SelectionButton
                         key={c}
-                        type="button"
+                        isSelected={selectedCountryName === c}
                         onClick={() => handleSelectCountry(c)}
-                        className={[
-                          'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
-                          selectedCountryName === c
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
-                        ].join(' ')}
                       >
                         {c}
-                      </button>
+                      </SelectionButton>
                     ))}
                   </div>
                 )}
@@ -684,38 +524,26 @@ function ProductRow({
                   <div className="space-y-1">
                     {usersTab === 'groups' &&
                       groups.map((g) => (
-                        <button
+                        <SelectionButton
                           key={g}
-                          type="button"
+                          isSelected={selectedGroupName === g}
                           onClick={() => handleSelectGroup(g)}
-                          className={[
-                            'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
-                            selectedGroupName === g
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
-                          ].join(' ')}
                         >
                           {g}
-                        </button>
+                        </SelectionButton>
                       ))}
                     {usersTab === 'users' &&
                       users.map((u) => (
-                        <button
+                        <SelectionButton
                           key={u.id}
-                          type="button"
+                          isSelected={selectedUser?.id === u.id}
                           onClick={() => handleSelectUser(u.id)}
-                          className={[
-                            'mb-1 w-full rounded border px-3 py-2 text-left transition-colors',
-                            selectedUser?.id === u.id
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50',
-                          ].join(' ')}
                         >
                           <div className="font-semibold">{u.name}</div>
                           <div className="text-[11px] text-slate-500">
                             {u.email}
                           </div>
-                        </button>
+                        </SelectionButton>
                       ))}
                   </div>
                 </div>
@@ -803,45 +631,51 @@ function ProductRow({
             )}
 
             {isSales && (
-              <Nextcell
-                hierarchicalColumns={months.map((month) => ({
-                  main: month,
-                  sub: ['Vol.', 'Price', 'Turnover'],
-                }))}
-                hierarchicalRows={productGroups.map((group) => ({
-                  group: group.name,
-                  items: group.products,
-                }))}
-                calculatedColumns={[
-                  {
-                    index: (colIndex: number) => {
-                      // Turnover columns are every 3rd column starting from index 2 (0-indexed: 2, 5, 8, ...)
-                      // In hierarchical structure: Vol.=0, Price=1, Turnover=2 for each month
-                      const subIndex = colIndex % 3
-                      return subIndex === 2 // Turnover is the 3rd sub-column (index 2)
+              <>
+                <Nextcell
+                  hierarchicalColumns={months.map((month) => ({
+                    main: month,
+                    sub: ['Vol.', 'Price', 'Turnover'],
+                  }))}
+                  hierarchicalRows={productGroups.map((group) => ({
+                    group: group.name,
+                    items: group.products,
+                  }))}
+                  calculatedColumns={[
+                    {
+                      index: (colIndex: number) => {
+                        // Turnover columns are every 3rd column starting from index 2 (0-indexed: 2, 5, 8, ...)
+                        // In hierarchical structure: Vol.=0, Price=1, Turnover=2 for each month
+                        const subIndex = colIndex % 3
+                        return subIndex === 2 // Turnover is the 3rd sub-column (index 2)
+                      },
+                      formula: (rowData, _allRowsData, _rowIndex, colIndex) => {
+                        // Get Vol. and Price for this month
+                        const monthIndex = Math.floor((colIndex ?? 0) / 3)
+                        const volIndex = monthIndex * 3 + 0
+                        const priceIndex = monthIndex * 3 + 1
+                        const vol = parseFloat(rowData[volIndex] || '0')
+                        const price = parseFloat(rowData[priceIndex] || '0')
+                        
+                        if (vol === 0 || price === 0 || isNaN(vol) || isNaN(price)) {
+                          return ''
+                        }
+                        
+                        return (vol * price).toFixed(2)
+                      },
                     },
-                    formula: (rowData, _allRowsData, _rowIndex, colIndex) => {
-                      // Get Vol. and Price for this month
-                      const monthIndex = Math.floor((colIndex ?? 0) / 3)
-                      const volIndex = monthIndex * 3 + 0
-                      const priceIndex = monthIndex * 3 + 1
-                      const vol = parseFloat(rowData[volIndex] || '0')
-                      const price = parseFloat(rowData[priceIndex] || '0')
-                      
-                      if (vol === 0 || price === 0 || isNaN(vol) || isNaN(price)) {
-                        return ''
-                      }
-                      
-                      return (vol * price).toFixed(2)
-                    },
-                  },
-                ]}
-                readOnlyColumns={(colIndex: number) => {
-                  // Turnover columns are read-only
-                  const subIndex = colIndex % 3
-                  return subIndex === 2
-                }}
-              />
+                  ]}
+                  readOnlyColumns={(colIndex: number) => {
+                    // Turnover columns are read-only
+                    const subIndex = colIndex % 3
+                    return subIndex === 2
+                  }}
+                />
+                <div className="mt-3 text-[10px] text-slate-500 space-y-1">
+                  <p><strong>Keyboard navigation:</strong> Arrow keys, Tab, Enter | <strong>Selection:</strong> Click + Shift/Ctrl for multi-select</p>
+                  <p><strong>Copy/Paste:</strong> Ctrl+C / Ctrl+V (Excel compatible) | <strong>Fill handle:</strong> Drag blue corner to replicate values</p>
+                </div>
+              </>
             )}
 
             {isMarket && (
@@ -851,69 +685,75 @@ function ProductRow({
                     Select a product first.
                   </div>
                 ) : (
-                  <Nextcell
-                    rows={companies.length}
-                    cols={4}
-                    colHeaders={[
-                      'Units',
-                      'ASP $/vial',
-                      'Market Sales',
-                      'MarketShare',
-                    ]}
-                    rowHeaders={companies}
-                    readOnlyColumns={[2, 3]}
-                    calculatedColumns={[
-                      {
-                        index: 2,
-                        formula: (rowData) => {
-                          // Calculate: Market Sales = Units * ASP $/vial
-                          const unitsCol = 0 // Units is column index 0
-                          const aspCol = 1 // ASP $/vial is column index 1
-                          const units = parseFloat(rowData[unitsCol] || '0')
-                          const asp = parseFloat(rowData[aspCol] || '0')
-                          
-                          if (units === 0 || asp === 0 || isNaN(units) || isNaN(asp)) {
-                            return ''
-                          }
-                          
-                          // Market Sales = Units * ASP $/vial
-                          const result = units * asp
-                          return result.toFixed(2)
-                        },
-                      },
-                      {
-                        index: 3,
-                        formula: (rowData, allRowsData) => {
-                          // Calculate: Market Share = Market Sales / Total Market Sales
-                          // First, calculate Market Sales for current row: Units * ASP $/vial
-                          const unitsCol = 0 // Units is column index 0
-                          const aspCol = 1 // ASP $/vial is column index 1
-                          const units = parseFloat(rowData[unitsCol] || '0')
-                          const asp = parseFloat(rowData[aspCol] || '0')
-                          
-                          let currentMarketSales = 0
-                          if (units !== 0 && asp !== 0 && !isNaN(units) && !isNaN(asp)) {
-                            currentMarketSales = units * asp
-                          }
-                          
-                          // Calculate Market Sales for all rows and sum them
-                          const totalMarketSales = allRowsData.reduce((sum, r) => {
-                            const rUnits = parseFloat(r[unitsCol] || '0')
-                            const rAsp = parseFloat(r[aspCol] || '0')
-                            if (rUnits !== 0 && rAsp !== 0 && !isNaN(rUnits) && !isNaN(rAsp)) {
-                              return sum + (rUnits * rAsp)
+                  <>
+                    <Nextcell
+                      rows={companies.length}
+                      cols={4}
+                      colHeaders={[
+                        'Units',
+                        'ASP $/vial',
+                        'Market Sales',
+                        'MarketShare',
+                      ]}
+                      rowHeaders={companies}
+                      readOnlyColumns={[2, 3]}
+                      calculatedColumns={[
+                        {
+                          index: 2,
+                          formula: (rowData) => {
+                            // Calculate: Market Sales = Units * ASP $/vial
+                            const unitsCol = 0 // Units is column index 0
+                            const aspCol = 1 // ASP $/vial is column index 1
+                            const units = parseFloat(rowData[unitsCol] || '0')
+                            const asp = parseFloat(rowData[aspCol] || '0')
+                            
+                            if (units === 0 || asp === 0 || isNaN(units) || isNaN(asp)) {
+                              return ''
                             }
-                            return sum
-                          }, 0)
-                          
-                          if (totalMarketSales === 0) return '0.0%'
-                          
-                          const percentage = (currentMarketSales / totalMarketSales) * 100
-                          return `${percentage.toFixed(1)}%`
+                            
+                            // Market Sales = Units * ASP $/vial
+                            const result = units * asp
+                            return result.toFixed(2)
+                          },
                         },
-                      },
-                    ]}
-                  />
+                        {
+                          index: 3,
+                          formula: (rowData, allRowsData) => {
+                            // Calculate: Market Share = Market Sales / Total Market Sales
+                            // First, calculate Market Sales for current row: Units * ASP $/vial
+                            const unitsCol = 0 // Units is column index 0
+                            const aspCol = 1 // ASP $/vial is column index 1
+                            const units = parseFloat(rowData[unitsCol] || '0')
+                            const asp = parseFloat(rowData[aspCol] || '0')
+                            
+                            let currentMarketSales = 0
+                            if (units !== 0 && asp !== 0 && !isNaN(units) && !isNaN(asp)) {
+                              currentMarketSales = units * asp
+                            }
+                            
+                            // Calculate Market Sales for all rows and sum them
+                            const totalMarketSales = allRowsData.reduce((sum, r) => {
+                              const rUnits = parseFloat(r[unitsCol] || '0')
+                              const rAsp = parseFloat(r[aspCol] || '0')
+                              if (rUnits !== 0 && rAsp !== 0 && !isNaN(rUnits) && !isNaN(rAsp)) {
+                                return sum + (rUnits * rAsp)
+                              }
+                              return sum
+                            }, 0)
+                            
+                            if (totalMarketSales === 0) return '0.0%'
+                            
+                            const percentage = (currentMarketSales / totalMarketSales) * 100
+                            return `${percentage.toFixed(1)}%`
+                          },
+                        },
+                      ]}
+                    />
+                    <div className="mt-3 text-[10px] text-slate-500 space-y-1">
+                      <p><strong>Keyboard navigation:</strong> Arrow keys, Tab, Enter | <strong>Selection:</strong> Click + Shift/Ctrl for multi-select</p>
+                      <p><strong>Copy/Paste:</strong> Ctrl+C / Ctrl+V (Excel compatible) | <strong>Fill handle:</strong> Drag blue corner to replicate values</p>
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -940,132 +780,20 @@ function ProductRow({
                       <label className="mb-1 block text-[11px] font-semibold text-slate-600">
                         Prices Types
                       </label>
-                      <div className="rounded border border-slate-300 bg-white">
-                        <div className="max-h-48 overflow-y-auto p-2">
-                          {priceTypes.map((priceType) => (
-                            <label
-                              key={priceType}
-                              className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 cursor-pointer rounded"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedPriceTypes.has(priceType)}
-                                onChange={() => handlePriceTypeToggle(priceType)}
-                                className="h-3 w-3 text-blue-600 focus:ring-blue-500 rounded"
-                              />
-                              <span className="text-xs text-slate-700">
-                                {priceType}
-                              </span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
+                      <PriceTypeSelector
+                        options={priceTypes}
+                        selected={selectedPriceTypes}
+                        onToggle={handlePriceTypeToggle}
+                      />
                     </div>
                     
                     <div className="border-t border-slate-200 pt-4">
-                      <h3 className="mb-3 text-sm font-semibold text-slate-800">
-                        Tipo de cambio €
-                      </h3>
-                      <div className="overflow-x-auto rounded border border-slate-300">
-                        <table className="w-full border-collapse text-xs">
-                          <thead>
-                            <tr className="bg-slate-100">
-                              <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
-                                Contravalor
-                              </th>
-                              <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
-                                Fecha inicial
-                              </th>
-                              <th className="border border-slate-300 px-3 py-2 text-left font-semibold text-slate-700">
-                                Fecha Final
-                              </th>
-                              <th className="border border-slate-300 px-3 py-2 text-center font-semibold text-slate-700 w-20">
-                                Acción
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {exchangeRates.map((row, index) => (
-                              <tr key={row.id}>
-                                <td className="border border-slate-300 p-0">
-                                  <input
-                                    type="text"
-                                    value={row.contravalor}
-                                    onChange={(e) => {
-                                      const newRates = [...exchangeRates]
-                                      newRates[index].contravalor = e.target.value
-                                      setExchangeRates(newRates)
-                                    }}
-                                    className="h-8 w-full border-0 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    placeholder="Contravalor"
-                                  />
-                                </td>
-                                <td className="border border-slate-300 p-0">
-                                  <input
-                                    type="date"
-                                    value={row.fechaInicial}
-                                    onChange={(e) => {
-                                      const newRates = [...exchangeRates]
-                                      newRates[index].fechaInicial = e.target.value
-                                      setExchangeRates(newRates)
-                                    }}
-                                    className="h-8 w-full border-0 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    placeholder="DD/MM/YYYY"
-                                  />
-                                </td>
-                                <td className="border border-slate-300 p-0">
-                                  <input
-                                    type="date"
-                                    value={row.fechaFinal}
-                                    onChange={(e) => {
-                                      const newRates = [...exchangeRates]
-                                      newRates[index].fechaFinal = e.target.value
-                                      setExchangeRates(newRates)
-                                    }}
-                                    className="h-8 w-full border-0 px-3 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                    placeholder="DD/MM/YYYY"
-                                  />
-                                </td>
-                                <td className="border border-slate-300 p-1 text-center">
-                                  {exchangeRates.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setExchangeRates(
-                                          exchangeRates.filter((_, i) => i !== index),
-                                        )
-                                      }}
-                                      className="rounded px-2 py-1 text-xs text-red-600 hover:bg-red-50"
-                                      title="Eliminar fila"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        <div className="border-t border-slate-300 bg-slate-50 px-3 py-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setExchangeRates([
-                                ...exchangeRates,
-                                {
-                                  id: Date.now().toString(),
-                                  contravalor: '',
-                                  fechaInicial: '',
-                                  fechaFinal: '',
-                                },
-                              ])
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            + Agregar fila
-                          </button>
-                        </div>
-                      </div>
+                      <ExchangeRateTable
+                        rows={exchangeRates}
+                        onChange={handleExchangeRateChange}
+                        onRemove={handleExchangeRateRemove}
+                        onAdd={handleExchangeRateAdd}
+                      />
                     </div>
                     
                     <div className="border-t border-slate-200 pt-4">

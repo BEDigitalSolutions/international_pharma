@@ -911,7 +911,7 @@ export function Nextcell({
                   }
                   onKeyDown={(e) => handleKeyDown(e, row, col)}
                   className={[
-                    'h-full w-full bg-transparent px-2 text-[11px] outline-none',
+                    'h-full w-full bg-transparent px-2 text-[11px] text-right outline-none',
                     isReadOnly ? 'cursor-not-allowed' : '',
                   ].join(' ')}
                   style={{
@@ -941,24 +941,27 @@ export function Nextcell({
 
   return (
     <div className="space-y-3 text-xs">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2 mb-3">
         {!readOnly && (
           <>
             <Button
               type="button"
               size="sm"
+              variant="outline"
               onClick={handleExportAndClear}
-              className="gap-2"
+              className="gap-2 flex-shrink-0 !opacity-100 !visible"
+              style={{ opacity: 1, visibility: 'visible' }}
             >
               <Download className="h-3 w-3" />
-              Export CSV &amp; Clear
+              Export to Excel
             </Button>
             <Button
               type="button"
               size="sm"
               variant="outline"
               onClick={handleClearTable}
-              className="gap-2"
+              className="gap-2 flex-shrink-0 !opacity-100 !visible"
+              style={{ opacity: 1, visibility: 'visible' }}
             >
               <Trash2 className="h-3 w-3" />
               Clear table
