@@ -7,7 +7,12 @@ The application uses a **three-panel layout** with the following default proport
 - **Left Panel (Menu)**: 1/8 of screen width (approximately 200px, resizable between 160px-400px)
   - Background: Light (bg-slate-100)
   - Selected menu item: Highlighted with blue background (bg-blue-100) and left border (border-l-4 border-blue-500)
-  - H1 menu levels (Reports, Data Entry, Master Data, Supervisor): No specific background, displayed with bold font, uppercase, and tracking-wide styling
+  - H1 menu levels (Reports, Data Entry, Master Data, Supervisor): 
+    - Color: #3b82f6 (blue-500)
+    - No specific background
+    - Displayed with bold font, uppercase, and tracking-wide styling
+    - Reduced left padding/margin for better alignment
+  - **Panel width consistency**: Left panel width remains constant across all module selections (including "Sales Data" which hides the center panel)
 - **Center Panel (Selection)**: 2/6 of screen width (resizable)
 - **Right Panel (Editing)**: 3/6 of screen width (resizable)
 
@@ -316,13 +321,15 @@ Deploy a backend API that:
 - URL configured via environment variables
 - Note: In development (localhost), CSP restrictions prevent direct embedding; informational message is displayed instead
 
+#### ## Process Visibility
+
+*Status: Not yet defined - placeholder*
+
+**Note**: This module was moved from "Data Entry" to "Reports" as an H2 submenu item.
+
 ---
 
 ### # DataEntry
-
-#### ## ProcessVisibility
-
-*Status: Not yet defined - placeholder*
 
 #### ## Patients News/Dropouts
 
@@ -498,6 +505,9 @@ Grup3
 
 **Right Panel (H4)**:
 
+- **Header**: 
+  - Title: "Countries setup - Country configuration"
+  - **Save changes button**: Located in the top-right corner of the header, aligned with the title level
 - Form structure: "Title : Data : Entry Type : (Available Values)"
   - **Currency**: Dropdown (€, $, YEN, Peso, ... [full list])
   - **Prices Types**: Multiple selection dropdown with checkboxes
@@ -518,6 +528,18 @@ Grup3
       - Delete button (✕) appears for each row when there is more than one row
       - Date fields support both calendar picker and direct text entry
       - Date format: DD/MM/YYYY (short date format)
+  - **Product Aliases**: Table with the following structure:
+    - **Title**: "Product Aliases"
+    - **Columns**:
+      - Prod1 (product name, read-only, displayed with gray background)
+      - AliasProd1 (text input, editable)
+    - **Behavior**:
+      - All products are automatically pre-loaded when a country is selected
+      - One row per product (from the products list: Albumin 20%, Albumin 25%, IVIG, Factor VIII, Factor IX, Fibrinogen, Prothrombin Complex, Antithrombin III)
+      - Product names are displayed directly (no dropdown selector)
+      - Only the "AliasProd1" field is editable
+      - Table is automatically populated when a country is selected in the center panel
+      - Table is cleared when no country is selected
 
 **Optional**: Search/filter field in center panel (not critical for initial mockup)
 
@@ -596,6 +618,7 @@ Grup3
 - Click interactions log to console for tracking
 - Modified/edited items can be flagged visually
 - Placeholder modules show "Not yet defined" message
+- **Placeholder styling**: All placeholder messages ("Not yet defined – placeholder", "Select a country in the center panel.", etc.) are displayed in orange color (#fb923c, orange-400) for better visibility
 - **Table structure**: Nested columns (months with subcolumns) and grouped rows (groups with nested products) require hierarchical table rendering
 - **Data entry**: All data entry modules use the Nextcell component (see `pr_Nextcell.md` for technical details)
 
