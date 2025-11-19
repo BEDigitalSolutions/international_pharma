@@ -29,10 +29,7 @@ export function PowerBIEmbed({ reportConfig, title }: PowerBIEmbedProps) {
         setEmbedStatus('loading')
 
         // Get embed token from backend (currently placeholder)
-        const tokenResponse = await getEmbedToken(
-          reportConfig.groupId,
-          reportConfig.reportId
-        )
+        const tokenResponse = await getEmbedToken()
 
         if (!tokenResponse) {
           setEmbedStatus('no-token')
@@ -71,18 +68,23 @@ export function PowerBIEmbed({ reportConfig, title }: PowerBIEmbedProps) {
         }
 
         // Embed the report
+        if (!embedContainer.current) return
         const report = powerbi.embed(embedContainer.current, config)
 
         // Handle report loaded event
         report.on('loaded', () => {
-          console.log('Report loaded successfully')
           setEmbedStatus('embedded')
         })
 
         // Handle report error event
         report.on('error', (event) => {
-          const errorDetail = (event as any).detail
-          console.error('Report error:', errorDetail)
+          interface PowerBIErrorEvent {
+            detail?: {
+              message?: string
+              errorCode?: string
+            }
+          }
+          const errorDetail = (event as PowerBIErrorEvent).detail
           setEmbedStatus('error')
           setErrorMessage(
             errorDetail?.message || 'Unknown error loading report'
@@ -94,7 +96,6 @@ export function PowerBIEmbed({ reportConfig, title }: PowerBIEmbedProps) {
           powerbi.reset(embedContainer.current!)
         }
       } catch (error) {
-        console.error('Error embedding Power BI report:', error)
         setEmbedStatus('error')
         setErrorMessage(
           error instanceof Error ? error.message : 'Unknown error'

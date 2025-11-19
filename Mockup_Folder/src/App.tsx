@@ -1,57 +1,58 @@
 import { useMemo, useState, useEffect } from 'react'
 import { Button } from './components/ui/button'
 import { Nextcell } from './components/nextcell/Nextcell'
-import { SelectionButton } from './components/common/SelectionButton'
 import { PriceTypeSelector } from './components/common/PriceTypeSelector'
 import {
   ExchangeRateTable,
   type ExchangeRateRow,
 } from './components/common/ExchangeRateTable'
+import {
+  ProductAliasTable,
+  type ProductAliasRow,
+} from './components/common/ProductAliasTable'
 import { getPowerBIConfig } from './lib/powerbi'
 import { PowerBIEmbed } from './components/PowerBIEmbed'
 import {
   countries,
-  patientsCountries,
-  countriesByContinent,
   productGroups,
   productsFlat,
   companies,
   months,
   currencies,
 } from './data/constants'
-import { groups, groupFunctions, users } from './data/users'
+import { groupFunctions } from './data/users'
 import { menuStructure } from './data/menu'
-import type { MainModuleKey, SubmoduleKey } from './data/menu'
-
-type UsersTab = 'groups' | 'users'
-
-type SelectedItem =
-  | { type: 'country'; value: string }
-  | { type: 'product'; value: string }
-  | { type: 'group'; value: string }
-  | { type: 'user'; value: number }
-  | null
+import { useAppContext } from './contexts/AppContext'
+import { usePanelResize } from './hooks/usePanelResize'
+import { useSelection } from './hooks/useSelection'
+import { LeftPanel } from './components/layout/LeftPanel'
+import { CenterPanel } from './components/layout/CenterPanel'
 
 function App() {
-  const [currentModule, setCurrentModule] = useState<MainModuleKey>('DataEntry')
-  const [currentSubmodule, setCurrentSubmodule] =
-    useState<SubmoduleKey>('PatientsNewsDropouts')
-  const [selectedItem, setSelectedItem] = useState<SelectedItem>(null)
-  const [usersTab, setUsersTab] = useState<UsersTab>('groups')
-  const [selectedCountries, setSelectedCountries] = useState<Set<string>>(
-    new Set(),
-  )
-  const [selectedContinent, setSelectedContinent] = useState<string>('')
-  const [leftPanelWidth, setLeftPanelWidth] = useState(200)
-  const [centerPanelWidth, setCenterPanelWidth] = useState(400)
-  const [isResizingLeft, setIsResizingLeft] = useState(false)
-  const [isResizingCenter, setIsResizingCenter] = useState(false)
-  const [exchangeRates, setExchangeRates] = useState<ExchangeRateRow[]>([
-    { id: '1', contravalor: '', fechaInicial: '', fechaFinal: '' },
-  ])
-  const [selectedPriceTypes, setSelectedPriceTypes] = useState<Set<string>>(
-    new Set(),
-  )
+  const {
+    currentModule,
+    currentSubmodule,
+    selectedCountryName,
+    selectedProductName,
+    selectedGroupName,
+    selectedUser,
+    exchangeRates,
+    setExchangeRates,
+    selectedPriceTypes,
+    setSelectedPriceTypes,
+  } = useAppContext()
+
+  const { selection: selectedCountries, toggle: handleCountryToggle } =
+    useSelection<string>(new Set())
+
+  const {
+    leftPanelWidth,
+    centerPanelWidth,
+    setIsResizingLeft,
+    setIsResizingCenter,
+  } = usePanelResize()
+
+  const [productAliases, setProductAliases] = useState<ProductAliasRow[]>([])
 
   const priceTypes = ['ASP', 'Maquila', 'Ex-Factory']
 
@@ -95,6 +96,32 @@ function App() {
     ])
   }
 
+  const handleProductAliasChange = (
+    id: string,
+    field: 'alias',
+    value: string,
+  ) => {
+    setProductAliases((prev) =>
+      prev.map((row) =>
+        row.id === id ? { ...row, [field]: value } : row
+      )
+    )
+  }
+
+  // Initialize product aliases with all products when country is selected
+  useEffect(() => {
+    if (currentSubmodule === 'CountriesSetup' && selectedCountryName) {
+      const initialAliases: ProductAliasRow[] = productsFlat.map((product, index) => ({
+        id: `product-${index}`,
+        product: product,
+        alias: '',
+      }))
+      setProductAliases(initialAliases)
+    } else if (!selectedCountryName && currentSubmodule === 'CountriesSetup') {
+      setProductAliases([])
+    }
+  }, [currentSubmodule, selectedCountryName])
+
   const currentModuleConfig = menuStructure[currentModule]
   const currentSubmoduleConfig =
     currentModuleConfig.submodules[currentSubmodule]
@@ -105,33 +132,6 @@ function App() {
 
   const showCenter = hasCenter && currentSubmodule !== 'SalesData'
 
-  const handleSelectCountry = (country: string) =>
-    setSelectedItem({ type: 'country', value: country })
-
-  const handleSelectProduct = (product: string) =>
-    setSelectedItem({ type: 'product', value: product })
-
-  const handleSelectGroup = (group: string) =>
-    setSelectedItem({ type: 'group', value: group })
-
-  const handleSelectUser = (userId: number) =>
-    setSelectedItem({ type: 'user', value: userId })
-
-  const selectedCountryName =
-    selectedItem?.type === 'country' ? selectedItem.value : null
-  const selectedProductName =
-    selectedItem?.type === 'product' ? selectedItem.value : null
-
-  const selectedGroupName =
-    selectedItem?.type === 'group' ? selectedItem.value : null
-  const selectedUser = useMemo(
-    () =>
-      selectedItem?.type === 'user'
-        ? users.find((u) => u.id === selectedItem.value) ?? null
-        : null,
-    [selectedItem],
-  )
-
   const isPatients = currentSubmodule === 'PatientsNewsDropouts'
   const isSales = currentSubmodule === 'SalesData'
   const isMarket = currentSubmodule === 'MarketInsights'
@@ -140,122 +140,15 @@ function App() {
 
   // Get Power BI configuration
   const powerBIConfig = useMemo(() => {
-    const config = getPowerBIConfig()
-    // Log configuration for debugging (remove in production)
-    if (import.meta.env.DEV) {
-      console.log('Power BI Configuration:', {
-        workspace: config.workspace,
-        salesTrends: config.salesTrends,
-        salesAnalysis: config.salesAnalysis,
-      })
-    }
-    return config
+    return getPowerBIConfig()
   }, [])
-
-  const handleCountryToggle = (country: string) => {
-    setSelectedCountries((prev) => {
-      const next = new Set(prev)
-      if (next.has(country)) {
-        next.delete(country)
-      } else {
-        next.add(country)
-      }
-      return next
-    })
-  }
-
-  // Panel resizing handlers
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isResizingLeft) {
-        const newWidth = Math.max(160, Math.min(400, e.clientX))
-        setLeftPanelWidth(newWidth)
-      }
-      if (isResizingCenter) {
-        const newWidth = Math.max(260, Math.min(800, e.clientX - leftPanelWidth))
-        setCenterPanelWidth(newWidth)
-      }
-    }
-
-    const handleMouseUp = () => {
-      setIsResizingLeft(false)
-      setIsResizingCenter(false)
-    }
-
-    if (isResizingLeft || isResizingCenter) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-      }
-    }
-  }, [isResizingLeft, isResizingCenter, leftPanelWidth])
 
 
 
   return (
     <div className="h-screen w-screen bg-slate-50 text-slate-900 flex">
       {/* LEFT PANEL */}
-      <aside
-        className="flex h-full flex-col bg-slate-100 border-r border-slate-200"
-        style={{ width: `${leftPanelWidth}px`, minWidth: '160px', maxWidth: '400px' }}
-      >
-        <div className="border-b border-slate-300 px-4 py-4">
-          <h1 className="text-lg font-semibold text-slate-900">
-            Biopharma Intl
-          </h1>
-          <p className="mt-1 text-xs text-slate-600">Data Entry System</p>
-        </div>
-
-        <nav className="flex-1 overflow-y-auto py-3" aria-label="Main menu">
-          {(Object.keys(menuStructure) as MainModuleKey[]).map((moduleKey) => {
-            const module = menuStructure[moduleKey]
-            return (
-              <div key={moduleKey} className="mb-2">
-                <div className="mx-2 mb-1 px-3 py-2 text-xs font-bold uppercase tracking-wide text-slate-800">
-                  {module.label}
-                </div>
-                <div>
-                  {(Object.keys(
-                    module.submodules,
-                  ) as SubmoduleKey[]).map((subKey) => {
-                    const sub = module.submodules[subKey]
-                    if (!sub) return null
-                    const active =
-                      currentModule === moduleKey &&
-                      currentSubmodule === subKey
-                    return (
-                      <button
-                        key={subKey}
-                        type="button"
-                        onClick={() => {
-                          setCurrentModule(moduleKey)
-                          setCurrentSubmodule(subKey)
-                          setSelectedItem(null)
-                        }}
-                        className={[
-                          'flex w-full items-center gap-2 px-4 py-2 text-left text-xs transition-colors',
-                          active
-                            ? 'border-l-4 border-blue-500 bg-blue-100 text-slate-900 font-medium'
-                            : 'hover:bg-slate-200 text-slate-700',
-                        ].join(' ')}
-                      >
-                        <span>{sub.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )
-          })}
-        </nav>
-
-        <div className="border-t border-slate-300 px-4 py-3 text-[11px] text-slate-600">
-          <p>Click to navigate.</p>
-          <p className="mt-1">Layout: Light, 3-panel (responsive).</p>
-        </div>
-      </aside>
+      <LeftPanel width={leftPanelWidth} />
 
       {/* LEFT PANEL RESIZE HANDLE */}
       {!isFullScreen && (
@@ -286,204 +179,18 @@ function App() {
 
       {/* CENTER PANEL */}
       {showCenter && !isFullScreen && (
-        <>
-          <main
-            className="flex h-full flex-col border-x border-slate-200 bg-white"
-            style={{ width: `${centerPanelWidth}px`, minWidth: '260px', maxWidth: '800px' }}
-          >
-          <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div>
-              <h2 className="text-xs font-semibold text-slate-800">
-                {currentSubmodule === 'PatientsNewsDropouts' && 'Countries'}
-                {currentSubmodule === 'MarketInsights' && 'Products'}
-                {currentSubmodule === 'CountriesSetup' && 'Countries'}
-                {currentSubmodule === 'Users' && 'Users & Groups'}
-                {currentSubmodule === 'ProcessVisibility' &&
-                  'Process Visibility'}
-                {currentSubmodule === 'ProductsFamilies' &&
-                  'Products/Families'}
-                {currentSubmodule === 'Scenarios' && 'Scenarios'}
-              </h2>
-              <p className="text-[11px] text-slate-500">
-                {currentSubmodule === 'PatientsNewsDropouts' &&
-                  'Select a country to edit patient data.'}
-                {currentSubmodule === 'MarketInsights' &&
-                  'Select a product to view market insights.'}
-                {currentSubmodule === 'CountriesSetup' &&
-                  'Select a country to configure.'}
-                {currentSubmodule === 'Users' &&
-                  'Manage users, groups and assignments.'}
-                {currentSubmodule === 'ProcessVisibility' &&
-                  'Not yet defined - placeholder.'}
-              </p>
-            </div>
-          </header>
-
-          <div className="flex-1 overflow-y-auto px-3 py-3 text-xs">
-            {currentSubmodule === 'PatientsNewsDropouts' && (
-              <div className="space-y-1">
-                {patientsCountries.map((c) => (
-                  <SelectionButton
-                    key={c}
-                    isSelected={selectedCountryName === c}
-                    onClick={() => handleSelectCountry(c)}
-                  >
-                    {c}
-                  </SelectionButton>
-                ))}
-              </div>
-            )}
-
-            {currentSubmodule === 'MarketInsights' && (
-              <div className="space-y-1">
-                {productsFlat.map((p) => (
-                  <SelectionButton
-                    key={p}
-                    isSelected={selectedProductName === p}
-                    onClick={() => handleSelectProduct(p)}
-                  >
-                    {p}
-                  </SelectionButton>
-                ))}
-              </div>
-            )}
-
-            {currentSubmodule === 'CountriesSetup' && (
-              <div className="space-y-3">
-                <div>
-                  <label className="mb-2 block text-xs font-semibold text-slate-700">
-                    Select Continent
-                  </label>
-                  <select
-                    value={selectedContinent}
-                    onChange={(e) => {
-                      setSelectedContinent(e.target.value)
-                      setSelectedItem(null) // Clear country selection when continent changes
-                    }}
-                    className="w-full rounded border border-slate-300 px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">-- Select Continent --</option>
-                    {Object.keys(countriesByContinent).map((continent) => (
-                      <option key={continent} value={continent}>
-                        {continent}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                {selectedContinent && (
-              <div className="space-y-1">
-                    <label className="mb-2 block text-xs font-semibold text-slate-700">
-                      Countries in {selectedContinent}
-                    </label>
-                    {countriesByContinent[selectedContinent]?.map((c) => (
-                      <SelectionButton
-                    key={c}
-                        isSelected={selectedCountryName === c}
-                    onClick={() => handleSelectCountry(c)}
-                  >
-                    {c}
-                      </SelectionButton>
-                ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {currentSubmodule === 'Users' && (
-              <div className="space-y-3">
-                <div className="flex gap-2">
-                  <Button size="sm">New ADGroup or User</Button>
-                  <Button size="sm" variant="outline" className="text-red-600">
-                    Delete
-                  </Button>
-                </div>
-                <div className="border-t border-slate-200 pt-3">
-                  <div className="mb-2 flex border-b border-slate-200 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setUsersTab('groups')}
-                      className={[
-                        'px-3 py-1',
-                        usersTab === 'groups'
-                          ? 'border-b-2 border-blue-500 font-semibold text-slate-800'
-                          : 'text-slate-500',
-                      ].join(' ')}
-                    >
-                      Groups
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setUsersTab('users')}
-                      className={[
-                        'px-3 py-1',
-                        usersTab === 'users'
-                          ? 'border-b-2 border-blue-500 font-semibold text-slate-800'
-                          : 'text-slate-500',
-                      ].join(' ')}
-                    >
-                      Users
-                    </button>
-                  </div>
-                  <div className="space-y-1">
-                    {usersTab === 'groups' &&
-                      groups.map((g) => (
-                        <SelectionButton
-                          key={g}
-                          isSelected={selectedGroupName === g}
-                          onClick={() => handleSelectGroup(g)}
-                        >
-                          {g}
-                        </SelectionButton>
-                      ))}
-                    {usersTab === 'users' &&
-                      users.map((u) => (
-                        <SelectionButton
-                          key={u.id}
-                          isSelected={selectedUser?.id === u.id}
-                          onClick={() => handleSelectUser(u.id)}
-                        >
-                          <div className="font-semibold">{u.name}</div>
-                          <div className="text-[11px] text-slate-500">
-                            {u.email}
-                          </div>
-                        </SelectionButton>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {currentSubmodule === 'ProcessVisibility' && (
-              <div className="flex h-full items-center justify-center text-slate-400">
-                Not yet defined – placeholder
-              </div>
-            )}
-
-            {(currentSubmodule === 'ProductsFamilies' ||
-              currentSubmodule === 'Scenarios') && (
-              <div className="flex h-full items-center justify-center text-slate-400">
-                Not yet defined – placeholder
-              </div>
-            )}
-          </div>
-        </main>
-
-        {/* CENTER PANEL RESIZE HANDLE */}
-        {hasRight && (
-          <div
-            className="w-1 cursor-col-resize bg-slate-300 hover:bg-blue-500 transition-colors"
-            onMouseDown={() => setIsResizingCenter(true)}
-            style={{ cursor: 'col-resize' }}
-          />
-        )}
-        </>
+        <CenterPanel
+          width={centerPanelWidth}
+          onResizeStart={() => setIsResizingCenter(true)}
+          showResizeHandle={hasRight}
+        />
       )}
 
       {/* RIGHT PANEL */}
       {hasRight && !isFullScreen && (
-        <section className="flex h-full flex-1 flex-col bg-white">
+        <section className="flex h-full flex-1 flex-col bg-white relative">
           <header className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <div>
+            <div className="flex-1">
               <h2 className="text-xs font-semibold text-slate-800">
                 {isPatients && 'Patients News/Dropouts'}
                 {isSales && 'Sales Data'}
@@ -497,7 +204,7 @@ function App() {
                   'Products/Families'}
                 {currentSubmodule === 'Scenarios' && 'Scenarios'}
               </h2>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px]" style={{ color: (!selectedCountryName && (isPatients || currentSubmodule === 'CountriesSetup')) || (!selectedProductName && isMarket) ? '#fb923c' : undefined }}>
                 {isPatients &&
                   (selectedCountryName
                     ? `Edit patient data for ${selectedCountryName} by product and month.`
@@ -518,13 +225,16 @@ function App() {
                     : 'Select a group or user in the center panel.')}
               </p>
             </div>
+            {currentSubmodule === 'CountriesSetup' && (
+              <Button size="sm">Save changes</Button>
+            )}
           </header>
 
           <div className="flex-1 overflow-auto p-4 text-xs">
             {isPatients && (
               <>
                 {!selectedCountryName ? (
-                  <div className="flex h-full items-center justify-center text-slate-400">
+                  <div className="flex h-full items-center justify-center" style={{ color: '#fb923c' }}>
                     Select a country first.
                   </div>
                 ) : (
@@ -628,7 +338,7 @@ function App() {
             {isMarket && (
               <>
                 {!selectedProductName ? (
-                  <div className="flex h-full items-center justify-center text-slate-400">
+                  <div className="flex h-full items-center justify-center" style={{ color: '#fb923c' }}>
                     Select a product first.
                   </div>
                 ) : (
@@ -708,9 +418,9 @@ function App() {
             {currentSubmodule === 'CountriesSetup' && (
               <>
                 {!selectedCountryName ? (
-                  <div className="flex h-full items-center justify-center text-slate-400">
-                    Select a country in the center panel.
-                  </div>
+                <div className="flex h-full items-center justify-center" style={{ color: '#fb923c' }}>
+                  Select a country in the center panel.
+                </div>
                 ) : (
                   <div className="max-w-2xl space-y-6">
                     <div>
@@ -744,7 +454,10 @@ function App() {
                     </div>
                     
                     <div className="border-t border-slate-200 pt-4">
-                      <Button size="md">Save changes</Button>
+                      <ProductAliasTable
+                        aliases={productAliases}
+                        onChange={handleProductAliasChange}
+                      />
                     </div>
                   </div>
                 )}
@@ -754,7 +467,7 @@ function App() {
             {currentSubmodule === 'Users' && (
               <>
                 {!selectedGroupName && !selectedUser ? (
-                  <div className="flex h-full items-center justify-center text-slate-400">
+                  <div className="flex h-full items-center justify-center" style={{ color: '#fb923c' }}>
                     Select a group or user in the center panel.
                   </div>
                 ) : (
@@ -813,7 +526,7 @@ function App() {
             {(currentSubmodule === 'ProcessVisibility' ||
               currentSubmodule === 'ProductsFamilies' ||
               currentSubmodule === 'Scenarios') && (
-                <div className="flex h-full items-center justify-center text-slate-400">
+                <div className="flex h-full items-center justify-center" style={{ color: '#fb923c' }}>
                   Not yet defined – placeholder
                 </div>
               )}

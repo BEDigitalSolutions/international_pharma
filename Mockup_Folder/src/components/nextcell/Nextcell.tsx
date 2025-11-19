@@ -268,12 +268,6 @@ export function Nextcell({
     }
   }, [data, calculatedColumns])
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      ;(window as any).__nextcellData = data
-    }
-  }, [data])
-
   // Propagate changes upwards
   useEffect(() => {
     if (onChange) onChange(data)
@@ -1004,14 +998,6 @@ export function Nextcell({
         newData[cellKey] = generateRandomValue(cell.header)
       }
 
-      if (import.meta.env.DEV) {
-        console.log('Nextcell demo data', {
-          cellsGenerated: Object.keys(newData).length,
-          rowsToFill,
-          totalRows: rows,
-          totalCols: cols,
-        })
-      }
       setData(newData)
       
       // Show success message
@@ -1052,7 +1038,7 @@ export function Nextcell({
   // Render hierarchical or flat headers
   const renderHeaders = () => {
     if (hierarchicalColumns) {
-      return (
+  return (
         <>
           {/* Main header row */}
           <tr>
@@ -1288,7 +1274,7 @@ export function Nextcell({
                 <X className="h-4 w-4" />
                 <span>Cancelar</span>
               </button>
-            </div>
+    </div>
 
             {/* Panel Content */}
             <div className="p-6 space-y-6">

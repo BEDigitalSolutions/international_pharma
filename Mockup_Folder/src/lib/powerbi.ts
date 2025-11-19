@@ -22,36 +22,6 @@ export interface PowerBIAzureConfig {
 }
 
 /**
- * Get Power BI embed URL for a report
- * 
- * @param config Report configuration with group ID, report ID, and optional section
- * @returns Full embed URL for Power BI iframe
- */
-export function getPowerBIEmbedUrl(config: PowerBIReportConfig): string {
-  const { groupId, reportId, section } = config
-  
-  // Base URL for Power BI embed
-  const baseUrl = 'https://app.powerbi.com/groups'
-  
-  // Construct the URL
-  let url = `${baseUrl}/${groupId}/reports/${reportId}`
-  
-  // Add section if provided
-  if (section) {
-    url += `/${section}`
-  }
-  
-  // Add embed parameters
-  url += '?experience=power-bi'
-  
-  // Optional: Add additional parameters for better embedding
-  // url += '&filterPaneEnabled=false'
-  // url += '&navContentPaneEnabled=false'
-  
-  return url
-}
-
-/**
  * Get Power BI configuration from environment variables
  */
 export function getPowerBIConfig(): {
@@ -119,10 +89,7 @@ export function getAzureADConfig(): PowerBIAzureConfig {
  * @param reportId Report ID
  * @returns Promise with embed token (placeholder returns empty for now)
  */
-export async function getEmbedToken(
-  groupId: string,
-  reportId: string
-): Promise<{
+export async function getEmbedToken(): Promise<{
   token: string
   tokenId: string
   expiration: string
@@ -135,8 +102,6 @@ export async function getEmbedToken(
   // 2. Call Power BI REST API: 
   //    POST https://api.powerbi.com/v1.0/myorg/groups/{groupId}/reports/{reportId}/GenerateToken
   // 3. Return the embed token to frontend
-  
-  console.warn('Embed token generation not implemented. Configure backend API.')
   
   // For development without backend, you can manually:
   // 1. Go to Power BI Service

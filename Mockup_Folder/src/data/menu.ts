@@ -42,16 +42,16 @@ export const menuStructure: MenuStructure = {
         hasRight: false,
         isFullScreen: true,
       },
-    },
-  },
-  DataEntry: {
-    label: 'Data Entry',
-    submodules: {
       ProcessVisibility: {
         label: 'Process Visibility',
         hasCenter: true,
         hasRight: true,
       },
+    },
+  },
+  DataEntry: {
+    label: 'Data Entry',
+    submodules: {
       PatientsNewsDropouts: {
         label: 'Patients News/Dropouts',
         hasCenter: true,
